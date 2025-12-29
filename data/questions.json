@@ -1,0 +1,296 @@
+[
+  {
+    "code": "DG.MQ.1",
+    "domain_code": "DG",
+    "question_en": "To what extent has the entity defined and documented data governance policies, standards, and procedures?",
+    "question_ar": "إلى أي مدى قامت الجهة بتحديد وتوثيق سياسات ومعايير وإجراءات حوكمة البيانات؟",
+    "sort_order": 1
+  },
+  {
+    "code": "DG.MQ.2",
+    "domain_code": "DG",
+    "question_en": "To what extent has the entity established data governance roles and responsibilities?",
+    "question_ar": "إلى أي مدى أنشأت الجهة أدوار ومسؤوليات حوكمة البيانات؟",
+    "sort_order": 2
+  },
+  {
+    "code": "DG.MQ.3",
+    "domain_code": "DG",
+    "question_en": "To what extent has the entity implemented data governance operating model?",
+    "question_ar": "إلى أي مدى نفذت الجهة نموذج تشغيل حوكمة البيانات؟",
+    "sort_order": 3
+  },
+  {
+    "code": "DG.MQ.4",
+    "domain_code": "DG",
+    "question_en": "To what extent has the entity established data governance performance measurement?",
+    "question_ar": "إلى أي مدى أنشأت الجهة قياس أداء حوكمة البيانات؟",
+    "sort_order": 4
+  },
+  {
+    "code": "MCM.MQ.1",
+    "domain_code": "MCM",
+    "question_en": "To what extent has the entity defined and implemented metadata management practices?",
+    "question_ar": "إلى أي مدى حددت الجهة ونفذت ممارسات إدارة البيانات الوصفية؟",
+    "sort_order": 1
+  },
+  {
+    "code": "MCM.MQ.2",
+    "domain_code": "MCM",
+    "question_en": "To what extent has the entity implemented a data catalog?",
+    "question_ar": "إلى أي مدى نفذت الجهة دليل البيانات؟",
+    "sort_order": 2
+  },
+  {
+    "code": "MCM.MQ.3",
+    "domain_code": "MCM",
+    "question_en": "To what extent has the entity established metadata standards?",
+    "question_ar": "إلى أي مدى أنشأت الجهة معايير البيانات الوصفية؟",
+    "sort_order": 3
+  },
+  {
+    "code": "DQ.MQ.1",
+    "domain_code": "DQ",
+    "question_en": "To what extent has the entity defined data quality requirements and metrics?",
+    "question_ar": "إلى أي مدى حددت الجهة متطلبات ومقاييس جودة البيانات؟",
+    "sort_order": 1
+  },
+  {
+    "code": "DQ.MQ.2",
+    "domain_code": "DQ",
+    "question_en": "To what extent has the entity implemented data quality measurement?",
+    "question_ar": "إلى أي مدى نفذت الجهة قياس جودة البيانات؟",
+    "sort_order": 2
+  },
+  {
+    "code": "DQ.MQ.3",
+    "domain_code": "DQ",
+    "question_en": "To what extent has the entity implemented data quality improvement processes?",
+    "question_ar": "إلى أي مدى نفذت الجهة عمليات تحسين جودة البيانات؟",
+    "sort_order": 3
+  },
+  {
+    "code": "DQ.MQ.4",
+    "domain_code": "DQ",
+    "question_en": "To what extent has the entity established data quality roles and responsibilities?",
+    "question_ar": "إلى أي مدى أنشأت الجهة أدوار ومسؤوليات جودة البيانات؟",
+    "sort_order": 4
+  },
+  {
+    "code": "DO.MQ.1",
+    "domain_code": "DO",
+    "question_en": "To what extent has the entity implemented data storage and operations management?",
+    "question_ar": "إلى أي مدى نفذت الجهة إدارة تخزين البيانات والعمليات؟",
+    "sort_order": 1
+  },
+  {
+    "code": "DO.MQ.2",
+    "domain_code": "DO",
+    "question_en": "To what extent has the entity implemented data backup and recovery procedures?",
+    "question_ar": "إلى أي مدى نفذت الجهة إجراءات النسخ الاحتياطي واستعادة البيانات؟",
+    "sort_order": 2
+  },
+  {
+    "code": "DO.MQ.3",
+    "domain_code": "DO",
+    "question_en": "To what extent has the entity implemented data retention and archiving?",
+    "question_ar": "إلى أي مدى نفذت الجهة الاحتفاظ بالبيانات وأرشفتها؟",
+    "sort_order": 3
+  },
+  {
+    "code": "DCM.MQ.1",
+    "domain_code": "DCM",
+    "question_en": "To what extent has the entity implemented document management practices?",
+    "question_ar": "إلى أي مدى نفذت الجهة ممارسات إدارة الوثائق؟",
+    "sort_order": 1
+  },
+  {
+    "code": "DCM.MQ.2",
+    "domain_code": "DCM",
+    "question_en": "To what extent has the entity implemented content management practices?",
+    "question_ar": "إلى أي مدى نفذت الجهة ممارسات إدارة المحتوى؟",
+    "sort_order": 2
+  },
+  {
+    "code": "DCM.MQ.3",
+    "domain_code": "DCM",
+    "question_en": "To what extent has the entity implemented records management?",
+    "question_ar": "إلى أي مدى نفذت الجهة إدارة السجلات؟",
+    "sort_order": 3
+  },
+  {
+    "code": "DAM.MQ.1",
+    "domain_code": "DAM",
+    "question_en": "To what extent has the entity defined data architecture?",
+    "question_ar": "إلى أي مدى حددت الجهة هيكلة البيانات؟",
+    "sort_order": 1
+  },
+  {
+    "code": "DAM.MQ.2",
+    "domain_code": "DAM",
+    "question_en": "To what extent has the entity implemented data modelling practices?",
+    "question_ar": "إلى أي مدى نفذت الجهة ممارسات نمذجة البيانات؟",
+    "sort_order": 2
+  },
+  {
+    "code": "DSI.MQ.1",
+    "domain_code": "DSI",
+    "question_en": "To what extent has the entity implemented data integration practices?",
+    "question_ar": "إلى أي مدى نفذت الجهة ممارسات تكامل البيانات؟",
+    "sort_order": 1
+  },
+  {
+    "code": "DSI.MQ.2",
+    "domain_code": "DSI",
+    "question_en": "To what extent has the entity implemented data sharing practices?",
+    "question_ar": "إلى أي مدى نفذت الجهة ممارسات مشاركة البيانات؟",
+    "sort_order": 2
+  },
+  {
+    "code": "DSI.MQ.3",
+    "domain_code": "DSI",
+    "question_en": "To what extent has the entity implemented data interoperability standards?",
+    "question_ar": "إلى أي مدى نفذت الجهة معايير التشغيل البيني للبيانات؟",
+    "sort_order": 3
+  },
+  {
+    "code": "DSI.MQ.4",
+    "domain_code": "DSI",
+    "question_en": "To what extent has the entity established data sharing agreements?",
+    "question_ar": "إلى أي مدى أنشأت الجهة اتفاقيات مشاركة البيانات؟",
+    "sort_order": 4
+  },
+  {
+    "code": "RMD.MQ.1",
+    "domain_code": "RMD",
+    "question_en": "To what extent has the entity implemented reference data management?",
+    "question_ar": "إلى أي مدى نفذت الجهة إدارة البيانات المرجعية؟",
+    "sort_order": 1
+  },
+  {
+    "code": "RMD.MQ.2",
+    "domain_code": "RMD",
+    "question_en": "To what extent has the entity implemented master data management?",
+    "question_ar": "إلى أي مدى نفذت الجهة إدارة البيانات الرئيسية؟",
+    "sort_order": 2
+  },
+  {
+    "code": "RMD.MQ.3",
+    "domain_code": "RMD",
+    "question_en": "To what extent has the entity established data standards for reference and master data?",
+    "question_ar": "إلى أي مدى أنشأت الجهة معايير البيانات للبيانات المرجعية والرئيسية؟",
+    "sort_order": 3
+  },
+  {
+    "code": "BIA.MQ.1",
+    "domain_code": "BIA",
+    "question_en": "To what extent has the entity implemented business intelligence capabilities?",
+    "question_ar": "إلى أي مدى نفذت الجهة قدرات ذكاء الأعمال؟",
+    "sort_order": 1
+  },
+  {
+    "code": "BIA.MQ.2",
+    "domain_code": "BIA",
+    "question_en": "To what extent has the entity implemented data analytics capabilities?",
+    "question_ar": "إلى أي مدى نفذت الجهة قدرات تحليلات البيانات؟",
+    "sort_order": 2
+  },
+  {
+    "code": "BIA.MQ.3",
+    "domain_code": "BIA",
+    "question_en": "To what extent has the entity implemented data visualization capabilities?",
+    "question_ar": "إلى أي مدى نفذت الجهة قدرات تصور البيانات؟",
+    "sort_order": 3
+  },
+  {
+    "code": "BIA.MQ.4",
+    "domain_code": "BIA",
+    "question_en": "To what extent has the entity implemented advanced analytics capabilities?",
+    "question_ar": "إلى أي مدى نفذت الجهة قدرات التحليلات المتقدمة؟",
+    "sort_order": 4
+  },
+  {
+    "code": "DVR.MQ.1",
+    "domain_code": "DVR",
+    "question_en": "To what extent has the entity defined data value metrics?",
+    "question_ar": "إلى أي مدى حددت الجهة مقاييس قيمة البيانات؟",
+    "sort_order": 1
+  },
+  {
+    "code": "DVR.MQ.2",
+    "domain_code": "DVR",
+    "question_en": "To what extent has the entity implemented data monetization strategies?",
+    "question_ar": "إلى أي مدى نفذت الجهة استراتيجيات تحقيق الدخل من البيانات؟",
+    "sort_order": 2
+  },
+  {
+    "code": "OD.MQ.1",
+    "domain_code": "OD",
+    "question_en": "To what extent has the entity implemented open data publishing?",
+    "question_ar": "إلى أي مدى نفذت الجهة نشر البيانات المفتوحة؟",
+    "sort_order": 1
+  },
+  {
+    "code": "OD.MQ.2",
+    "domain_code": "OD",
+    "question_en": "To what extent has the entity established open data governance?",
+    "question_ar": "إلى أي مدى أنشأت الجهة حوكمة البيانات المفتوحة؟",
+    "sort_order": 2
+  },
+  {
+    "code": "OD.MQ.3",
+    "domain_code": "OD",
+    "question_en": "To what extent has the entity implemented open data quality standards?",
+    "question_ar": "إلى أي مدى نفذت الجهة معايير جودة البيانات المفتوحة؟",
+    "sort_order": 3
+  },
+  {
+    "code": "FOI.MQ.1",
+    "domain_code": "FOI",
+    "question_en": "To what extent has the entity implemented freedom of information practices?",
+    "question_ar": "إلى أي مدى نفذت الجهة ممارسات حرية المعلومات؟",
+    "sort_order": 1
+  },
+  {
+    "code": "FOI.MQ.2",
+    "domain_code": "FOI",
+    "question_en": "To what extent has the entity established information request handling procedures?",
+    "question_ar": "إلى أي مدى أنشأت الجهة إجراءات التعامل مع طلبات المعلومات؟",
+    "sort_order": 2
+  },
+  {
+    "code": "DC.MQ.1",
+    "domain_code": "DC",
+    "question_en": "To what extent has the entity implemented data classification framework?",
+    "question_ar": "إلى أي مدى نفذت الجهة إطار تصنيف البيانات؟",
+    "sort_order": 1
+  },
+  {
+    "code": "DC.MQ.2",
+    "domain_code": "DC",
+    "question_en": "To what extent has the entity implemented data classification policies?",
+    "question_ar": "إلى أي مدى نفذت الجهة سياسات تصنيف البيانات؟",
+    "sort_order": 2
+  },
+  {
+    "code": "DC.MQ.3",
+    "domain_code": "DC",
+    "question_en": "To what extent has the entity implemented data handling based on classification?",
+    "question_ar": "إلى أي مدى نفذت الجهة التعامل مع البيانات بناءً على التصنيف؟",
+    "sort_order": 3
+  },
+  {
+    "code": "PDP.MQ.1",
+    "domain_code": "PDP",
+    "question_en": "To what extent has the entity implemented personal data protection practices?",
+    "question_ar": "إلى أي مدى نفذت الجهة ممارسات حماية البيانات الشخصية؟",
+    "sort_order": 1
+  },
+  {
+    "code": "PDP.MQ.2",
+    "domain_code": "PDP",
+    "question_en": "To what extent has the entity implemented privacy compliance?",
+    "question_ar": "إلى أي مدى نفذت الجهة الامتثال للخصوصية؟",
+    "sort_order": 2
+  }
+]

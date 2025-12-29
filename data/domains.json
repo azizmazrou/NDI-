@@ -1,0 +1,142 @@
+[
+  {
+    "code": "DG",
+    "name_en": "Data Governance",
+    "name_ar": "حوكمة البيانات",
+    "description_en": "The exercise of authority and control over the management of data assets.",
+    "description_ar": "ممارسة السلطة والسيطرة على إدارة أصول البيانات.",
+    "question_count": 4,
+    "is_oe_domain": false,
+    "sort_order": 1
+  },
+  {
+    "code": "MCM",
+    "name_en": "Metadata and Data Catalog Management",
+    "name_ar": "البيانات الوصفية ودليل البيانات",
+    "description_en": "Planning, implementation, and control of activities to enable access to high quality, integrated metadata.",
+    "description_ar": "تخطيط وتنفيذ ومراقبة الأنشطة لتمكين الوصول إلى البيانات الوصفية المتكاملة عالية الجودة.",
+    "question_count": 3,
+    "is_oe_domain": false,
+    "sort_order": 2
+  },
+  {
+    "code": "DQ",
+    "name_en": "Data Quality",
+    "name_ar": "جودة البيانات",
+    "description_en": "Planning and implementation of quality management techniques to measure, assess, improve, and ensure the fitness of data for use.",
+    "description_ar": "تخطيط وتنفيذ تقنيات إدارة الجودة لقياس وتقييم وتحسين وضمان ملاءمة البيانات للاستخدام.",
+    "question_count": 4,
+    "is_oe_domain": false,
+    "sort_order": 3
+  },
+  {
+    "code": "DO",
+    "name_en": "Data Operations",
+    "name_ar": "تخزين البيانات",
+    "description_en": "Planning, control, and support for structured data assets across the data lifecycle.",
+    "description_ar": "تخطيط ومراقبة ودعم أصول البيانات المهيكلة عبر دورة حياة البيانات.",
+    "question_count": 3,
+    "is_oe_domain": false,
+    "sort_order": 4
+  },
+  {
+    "code": "DCM",
+    "name_en": "Document and Content Management",
+    "name_ar": "إدارة المحتوى والوثائق",
+    "description_en": "Planning, implementation, and control of activities to store, protect, and access data in unstructured sources.",
+    "description_ar": "تخطيط وتنفيذ ومراقبة الأنشطة لتخزين وحماية والوصول إلى البيانات في المصادر غير المهيكلة.",
+    "question_count": 3,
+    "is_oe_domain": false,
+    "sort_order": 5
+  },
+  {
+    "code": "DAM",
+    "name_en": "Data Architecture and Modelling",
+    "name_ar": "النمذجة وهيكلة البيانات",
+    "description_en": "Defining the blueprint for managing data assets by aligning with organizational strategy.",
+    "description_ar": "تحديد المخطط لإدارة أصول البيانات من خلال المواءمة مع استراتيجية المنظمة.",
+    "question_count": 2,
+    "is_oe_domain": false,
+    "sort_order": 6
+  },
+  {
+    "code": "DSI",
+    "name_en": "Data Sharing and Interoperability",
+    "name_ar": "تكامل البيانات ومشاركتها",
+    "description_en": "Planning, implementation, and control of activities related to data integration and data interoperability.",
+    "description_ar": "تخطيط وتنفيذ ومراقبة الأنشطة المتعلقة بتكامل البيانات وقابلية التشغيل البيني للبيانات.",
+    "question_count": 4,
+    "is_oe_domain": false,
+    "sort_order": 7
+  },
+  {
+    "code": "RMD",
+    "name_en": "Reference and Master Data Management",
+    "name_ar": "إدارة البيانات المرجعية والرئيسية",
+    "description_en": "Planning, implementation, and control of activities to ensure consistency with a master data record.",
+    "description_ar": "تخطيط وتنفيذ ومراقبة الأنشطة لضمان الاتساق مع سجل البيانات الرئيسية.",
+    "question_count": 3,
+    "is_oe_domain": false,
+    "sort_order": 8
+  },
+  {
+    "code": "BIA",
+    "name_en": "Business Intelligence and Analytics",
+    "name_ar": "ذكاء الأعمال والتحليلات",
+    "description_en": "Planning, implementation, and control of activities that enable getting value from data through analysis.",
+    "description_ar": "تخطيط وتنفيذ ومراقبة الأنشطة التي تمكن من الحصول على قيمة من البيانات من خلال التحليل.",
+    "question_count": 4,
+    "is_oe_domain": false,
+    "sort_order": 9
+  },
+  {
+    "code": "DVR",
+    "name_en": "Data Value Realization",
+    "name_ar": "تحقيق القيمة من البيانات",
+    "description_en": "Managing and measuring the value derived from data assets.",
+    "description_ar": "إدارة وقياس القيمة المستمدة من أصول البيانات.",
+    "question_count": 2,
+    "is_oe_domain": false,
+    "sort_order": 10
+  },
+  {
+    "code": "OD",
+    "name_en": "Open Data",
+    "name_ar": "البيانات المفتوحة",
+    "description_en": "Making data freely available for use and republishing without restrictions.",
+    "description_ar": "إتاحة البيانات مجاناً للاستخدام وإعادة النشر دون قيود.",
+    "question_count": 3,
+    "is_oe_domain": false,
+    "sort_order": 11
+  },
+  {
+    "code": "FOI",
+    "name_en": "Freedom of Information",
+    "name_ar": "حرية المعلومات",
+    "description_en": "Managing access to information held by public bodies.",
+    "description_ar": "إدارة الوصول إلى المعلومات التي تحتفظ بها الجهات العامة.",
+    "question_count": 2,
+    "is_oe_domain": false,
+    "sort_order": 12
+  },
+  {
+    "code": "DC",
+    "name_en": "Data Classification",
+    "name_ar": "تصنيف البيانات",
+    "description_en": "Categorizing data based on its sensitivity and the impact to the organization.",
+    "description_ar": "تصنيف البيانات بناءً على حساسيتها وتأثيرها على المنظمة.",
+    "question_count": 3,
+    "is_oe_domain": false,
+    "sort_order": 13
+  },
+  {
+    "code": "PDP",
+    "name_en": "Personal Data Protection",
+    "name_ar": "حماية البيانات الشخصية",
+    "description_en": "Protecting personal data and ensuring privacy rights.",
+    "description_ar": "حماية البيانات الشخصية وضمان حقوق الخصوصية.",
+    "question_count": 2,
+    "is_oe_domain": false,
+    "sort_order": 14
+  }
+]

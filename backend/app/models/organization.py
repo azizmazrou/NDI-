@@ -1,0 +1,44 @@
+"""Organization model."""
+import uuid
+from datetime import datetime
+from typing import TYPE_CHECKING, List
+
+from sqlalchemy import String, DateTime, func
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.assessment import Assessment
+
+
+class Organization(Base):
+    """Organization / الجهة model."""
+
+    __tablename__ = "organizations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    name_en: Mapped[str] = mapped_column(String(255), nullable=False)
+    name_ar: Mapped[str] = mapped_column(String(255), nullable=False)
+    sector: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    description_en: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    description_ar: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    website: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    assessments: Mapped[List["Assessment"]] = relationship(
+        "Assessment", back_populates="organization", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:
+        return f"<Organization(id={self.id}, name_en={self.name_en})>"

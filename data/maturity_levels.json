@@ -1,0 +1,72 @@
+{
+  "levels": [
+    {
+      "level": 0,
+      "name_en": "Absence of Capabilities",
+      "name_ar": "غياب القدرات",
+      "score_min": 0,
+      "score_max": 0.24
+    },
+    {
+      "level": 1,
+      "name_en": "Establishing",
+      "name_ar": "التأسيس",
+      "score_min": 0.25,
+      "score_max": 1.24
+    },
+    {
+      "level": 2,
+      "name_en": "Defined",
+      "name_ar": "التحديد",
+      "score_min": 1.25,
+      "score_max": 2.49
+    },
+    {
+      "level": 3,
+      "name_en": "Activated",
+      "name_ar": "التفعيل",
+      "score_min": 2.5,
+      "score_max": 3.99
+    },
+    {
+      "level": 4,
+      "name_en": "Managed",
+      "name_ar": "الإدارة",
+      "score_min": 4,
+      "score_max": 4.74
+    },
+    {
+      "level": 5,
+      "name_en": "Pioneer",
+      "name_ar": "الريادة",
+      "score_min": 4.75,
+      "score_max": 5
+    }
+  ],
+  "level_descriptions": {
+    "0": {
+      "description_en": "No capabilities exist. The entity has not started any initiatives in this area.",
+      "description_ar": "لا توجد قدرات. لم تبدأ الجهة أي مبادرات في هذا المجال."
+    },
+    "1": {
+      "description_en": "Initial awareness and ad-hoc activities. Some basic activities may exist but are not formalized.",
+      "description_ar": "وعي أولي وأنشطة عشوائية. قد توجد بعض الأنشطة الأساسية لكنها غير رسمية."
+    },
+    "2": {
+      "description_en": "Policies and procedures are defined and documented. Roles and responsibilities are assigned.",
+      "description_ar": "السياسات والإجراءات محددة وموثقة. الأدوار والمسؤوليات معينة."
+    },
+    "3": {
+      "description_en": "Processes are implemented and actively used. Training is provided and performance is monitored.",
+      "description_ar": "العمليات منفذة ومستخدمة بفعالية. يتم توفير التدريب ومراقبة الأداء."
+    },
+    "4": {
+      "description_en": "Processes are measured, controlled, and continuously improved. Automation is implemented.",
+      "description_ar": "العمليات مُقاسة ومُتحكم بها ومُحسَّنة باستمرار. الأتمتة منفذة."
+    },
+    "5": {
+      "description_en": "Industry-leading practices. Innovation and continuous optimization. Recognized as a leader.",
+      "description_ar": "ممارسات رائدة في المجال. الابتكار والتحسين المستمر. معترف بها كرائدة."
+    }
+  }
+}

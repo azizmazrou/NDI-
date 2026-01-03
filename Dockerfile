@@ -79,7 +79,9 @@ COPY --chown=appuser:appuser data/ /app/data/
 COPY --from=frontend-builder /app/.next/standalone /app/frontend/
 # 2. Copy static files into standalone's .next/static (required for production)
 COPY --from=frontend-builder /app/.next/static /app/frontend/.next/static
-# 3. Copy public assets
+# 3. Copy server files (App Router manifests) - fixes next-intl standalone issue
+COPY --from=frontend-builder /app/.next/server /app/frontend/.next/server
+# 4. Copy public assets
 COPY --from=frontend-builder /app/public /app/frontend/public
 
 # Create necessary directories

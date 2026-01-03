@@ -9,6 +9,10 @@ const nextConfig = {
 
   experimental: {
     serverActions: true,
+    // Include App Router manifest files in standalone output
+    outputFileTracingIncludes: {
+      "/*": ["./app/**/*"],
+    },
   },
 
   images: {

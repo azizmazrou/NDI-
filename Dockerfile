@@ -99,8 +99,8 @@ ENV PYTHONUNBUFFERED=1 \
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:80/health || curl -f http://localhost:8833/health || exit 1
 
-# Expose single port (nginx will handle routing)
-EXPOSE 80
+# Expose ports for remote access
+EXPOSE 80 8833 3388
 
 # Start supervisor (manages nginx, backend, and frontend)
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

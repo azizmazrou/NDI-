@@ -95,12 +95,15 @@ services:
     container_name: ndi-app
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-ndi_user}:${POSTGRES_PASSWORD:-ndi_password}@postgres:5432/${POSTGRES_DB:-ndi_db}
-      - REDIS_URL=redis://redis:6379
-      - QDRANT_URL=http://qdrant:6333
-      - APP_ENV=production
-      - DEBUG=false
+      # Use DATABASE_URL from .env file or default to container name
+      # For external DB, set DATABASE_URL in .env: DATABASE_URL=postgresql://user:pass@192.168.1.102:5432/ndi_db
+      - DATABASE_URL=${DATABASE_URL:-postgresql://ndi_user:ndi_password@postgres:5432/ndi_db}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
+      - APP_ENV=${APP_ENV:-production}
+      - DEBUG=${DEBUG:-false}
       - SECRET_KEY=${SECRET_KEY:-change-this-secret-key}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost,http://localhost:80}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}

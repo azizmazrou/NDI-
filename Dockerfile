@@ -56,14 +56,15 @@ FROM python:3.11-slim AS production
 
 WORKDIR /app
 
-# Install runtime dependencies
+# Install runtime dependencies including Node.js 18
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
     nginx \
     supervisor \
-    nodejs \
-    npm \
+    gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --shell /bin/bash --uid 1000 appuser
 

@@ -63,19 +63,19 @@ df -h
 
 ```bash
 # Clone and setup / الاستنساخ والإعداد
-git clone https://github.com/your-org/ndi-compliance-system.git
-cd ndi-compliance-system
-chmod +x scripts/docker-setup.sh
-./scripts/docker-setup.sh
+git clone https://github.com/azizmazrou/NDI-.git
+cd NDI-
+cp .env.example .env
+docker-compose up -d
 ```
 
 ### Using Make / باستخدام Make
 
 ```bash
-git clone https://github.com/your-org/ndi-compliance-system.git
-cd ndi-compliance-system
+git clone https://github.com/azizmazrou/NDI-.git
+cd NDI-
 cp .env.example .env
-make dev
+make up-build
 make seed
 ```
 
@@ -85,9 +85,9 @@ After installation, access the application at:
 
 بعد التثبيت، يمكنك الوصول إلى التطبيق على:
 
-- **Frontend / الواجهة الأمامية**: http://localhost:3000
-- **API Documentation / توثيق API**: http://localhost:8000/api/docs
-- **API (Arabic) / واجهة API**: http://localhost:8000/api/redoc
+- **Application / التطبيق**: http://localhost (port 80)
+- **API Documentation / توثيق API**: http://localhost/docs
+- **API (ReDoc) / واجهة API**: http://localhost/redoc
 
 ---
 
@@ -96,8 +96,8 @@ After installation, access the application at:
 ### Step 1: Clone Repository / الخطوة 1: استنساخ المستودع
 
 ```bash
-git clone https://github.com/your-org/ndi-compliance-system.git
-cd ndi-compliance-system
+git clone https://github.com/azizmazrou/NDI-.git
+cd NDI-
 ```
 
 ### Step 2: Configure Environment / الخطوة 2: تكوين البيئة
@@ -127,22 +127,22 @@ docker-compose ps
 ### Step 4: Start Application / الخطوة 4: بدء التطبيق
 
 ```bash
-# Start backend and frontend / بدء الخلفية والواجهة الأمامية
-docker-compose up -d backend frontend
+# Start the unified app container / بدء حاوية التطبيق الموحدة
+docker-compose up -d app
 
 # View logs / عرض السجلات
-docker-compose logs -f
+docker-compose logs -f app
 ```
 
 ### Step 5: Initialize Database / الخطوة 5: تهيئة قاعدة البيانات
 
 ```bash
 # Run database migrations / تشغيل ترحيلات قاعدة البيانات
-docker-compose exec backend alembic upgrade head
+docker-compose exec app /opt/venv/bin/alembic -c /app/backend/alembic.ini upgrade head
 
 # Seed NDI data (domains, questions, levels)
 # زرع بيانات المؤشر (المجالات، الأسئلة، المستويات)
-docker-compose exec backend python -m app.scripts.seed_ndi_data
+docker-compose exec app /opt/venv/bin/python -m app.scripts.seed_ndi_data
 ```
 
 ### Step 6: Verify Installation / الخطوة 6: التحقق من التثبيت
@@ -151,11 +151,11 @@ docker-compose exec backend python -m app.scripts.seed_ndi_data
 # Check all services are running / التحقق من تشغيل جميع الخدمات
 docker-compose ps
 
-# Test backend health / اختبار صحة الخلفية
-curl http://localhost:8000/health
+# Test application health / اختبار صحة التطبيق
+curl http://localhost/health
 
 # Test frontend / اختبار الواجهة الأمامية
-curl -I http://localhost:3000
+curl -I http://localhost
 ```
 
 ---

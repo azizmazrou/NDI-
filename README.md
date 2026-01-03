@@ -23,23 +23,52 @@ A comprehensive web system for assessing Saudi government entities' compliance w
 - **AI**: LangChain + Google Gemini / Azure OpenAI
 - **Auth**: NextAuth.js
 - **i18n**: next-intl (AR/EN)
+- **Container**: Docker with unified image (backend + frontend)
 
-## Quick Start
+## Quick Start / البدء السريع
 
-### Prerequisites
-
-- Node.js 18+
-- Python 3.11+
-- PostgreSQL 15+
-- Docker & Docker Compose (optional)
-
-### Using Docker
+### Using Docker (Recommended) / باستخدام Docker (موصى به)
 
 ```bash
+# Clone the repository / استنساخ المستودع
+git clone https://github.com/azizmazrou/NDI-.git
+cd NDI-
+
+# Copy environment file / نسخ ملف البيئة
+cp .env.example .env
+
+# Start all services / بدء جميع الخدمات
+docker-compose up -d
+
+# Seed NDI data / زرع بيانات المؤشر
+docker-compose exec app /opt/venv/bin/python -m app.scripts.seed_ndi_data
+
+# Access the application / الوصول إلى التطبيق
+# http://localhost (port 80)
+```
+
+### Using Make Commands / باستخدام أوامر Make
+
+```bash
+make up          # Start all services / بدء الخدمات
+make up-build    # Build and start / بناء وبدء
+make down        # Stop services / إيقاف الخدمات
+make logs        # View logs / عرض السجلات
+make seed        # Seed NDI data / زرع البيانات
+make health      # Check health / فحص الصحة
+```
+
+### Using Pre-built Docker Image / استخدام صورة Docker الجاهزة
+
+```bash
+# Pull the image / سحب الصورة
+docker pull ghcr.io/azizmazrou/ndi-compliance-system:latest
+
+# Run with docker-compose / التشغيل مع docker-compose
 docker-compose up -d
 ```
 
-### Manual Setup
+### Manual Setup / الإعداد اليدوي
 
 #### Backend
 
@@ -59,33 +88,62 @@ npm install
 npm run dev
 ```
 
-### Database Migrations
+## Architecture / البنية
 
-```bash
-cd backend
-alembic upgrade head
+The system runs as a unified Docker container with:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      NDI App Container                       │
+│                      (Port 80)                               │
+├─────────────────────────────────────────────────────────────┤
+│                         Nginx                                │
+│                    (Reverse Proxy)                          │
+│                   /api/* → Backend                          │
+│                   /*     → Frontend                         │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐              ┌─────────────────┐       │
+│  │    Frontend     │              │     Backend     │       │
+│  │   (Next.js)     │              │   (FastAPI)     │       │
+│  │   Port 3000     │              │   Port 8000     │       │
+│  └─────────────────┘              └─────────────────┘       │
+└─────────────────────────────────────────────────────────────┘
+              │                           │
+    ┌─────────┴─────────┬────────────────┴───────────┐
+    ▼                   ▼                            ▼
+┌─────────┐      ┌─────────────┐              ┌──────────┐
+│PostgreSQL│     │    Redis    │              │  Qdrant  │
+│  :5432   │     │    :6379    │              │  :6333   │
+└─────────┘      └─────────────┘              └──────────┘
 ```
 
-### Seed NDI Data
-
-```bash
-cd backend
-python -m app.scripts.seed_ndi_data
-```
-
-## Project Structure
+## Project Structure / هيكل المشروع
 
 ```
 ndi-system/
-├── frontend/          # Next.js 14 application
-├── backend/           # FastAPI application
-├── ai/                # AI/RAG modules
-├── data/              # Seed data (JSON)
-├── docker-compose.yml
-└── README.md
+├── Dockerfile           # Unified Docker image
+├── docker-compose.yml   # Docker services configuration
+├── Makefile            # Convenient commands
+├── frontend/           # Next.js 14 application
+│   ├── app/           # App router pages
+│   ├── components/    # React components
+│   ├── messages/      # i18n translations (ar/en)
+│   └── lib/           # Utilities and API client
+├── backend/            # FastAPI application
+│   ├── app/
+│   │   ├── models/    # SQLAlchemy models
+│   │   ├── schemas/   # Pydantic schemas
+│   │   ├── routers/   # API endpoints
+│   │   └── services/  # Business logic
+│   └── alembic/       # Database migrations
+├── docker/             # Docker configuration
+│   ├── nginx.conf     # Nginx reverse proxy
+│   └── supervisord.conf # Process manager
+├── data/               # Seed data (JSON)
+└── docs/               # Documentation
 ```
 
-## NDI Structure
+## NDI Structure / هيكل المؤشر
 
 ### 14 Domains / المجالات الـ14
 
@@ -117,27 +175,58 @@ ndi-system/
 | 4 | Managed | الإدارة | 4 - 4.74 |
 | 5 | Pioneer | الريادة | 4.75 - 5 |
 
-## Environment Variables
+## Environment Variables / متغيرات البيئة
 
 Copy `.env.example` to `.env` and configure:
 
 ```env
-# Database
-DATABASE_URL=postgresql://user:pass@localhost:5432/ndi_db
+# Database / قاعدة البيانات
+POSTGRES_USER=ndi_user
+POSTGRES_PASSWORD=your_secure_password
+POSTGRES_DB=ndi_db
 
-# AI Providers
-GOOGLE_API_KEY=your_key
-AZURE_OPENAI_API_KEY=your_key
+# Application / التطبيق
+SECRET_KEY=your_secret_key
+APP_PORT=80
 
-# Auth
+# Auth / المصادقة
+NEXTAUTH_URL=http://localhost
 NEXTAUTH_SECRET=your_secret
+
+# AI Providers (Optional) / مزودي الذكاء الاصطناعي
+GOOGLE_API_KEY=your_key
+OPENAI_API_KEY=your_key
+AZURE_OPENAI_API_KEY=your_key
 ```
+
+## API Documentation / توثيق API
+
+When running, access API documentation at:
+- Swagger UI: http://localhost/docs
+- ReDoc: http://localhost/redoc
+
+## Docker Image / صورة Docker
+
+The unified Docker image is automatically built and published to GitHub Container Registry:
+
+```bash
+# Pull latest image / سحب أحدث صورة
+docker pull ghcr.io/azizmazrou/ndi-compliance-system:latest
+
+# Pull specific version / سحب إصدار محدد
+docker pull ghcr.io/azizmazrou/ndi-compliance-system:v1.0.0
+```
+
+## Documentation / التوثيق
+
+- [Installation Guide / دليل التثبيت](./docs/INSTALLATION.md)
+- [Docker Guide / دليل Docker](./docs/DOCKER.md)
 
 ## License
 
 MIT License
 
-## References
+## References / المراجع
 
 - [NDI English PDF](https://sdaia.gov.sa/en/Research/Documents/National-Data-Index_v1.0_EN.PDF)
 - [NDI Arabic PDF](https://sdaia.gov.sa/ar/Research/Documents/National-Data-Index_v1.0_AR.PDF)

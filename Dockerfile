@@ -74,14 +74,12 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY --chown=appuser:appuser backend/ /app/backend/
 COPY --chown=appuser:appuser data/ /app/data/
 
-# Copy frontend build - Next.js 14.2 standalone with full manifests
-# 1. Copy standalone build (server.js, node_modules, and base .next)
+# Copy frontend build - Next.js standalone with complete .next
+# 1. Copy standalone build (server.js, node_modules)
 COPY --from=frontend-builder /app/.next/standalone /app/frontend/
-# 2. Copy static assets
-COPY --from=frontend-builder /app/.next/static /app/frontend/.next/static
-# 3. Copy server app directory (contains client manifests for App Router)
-COPY --from=frontend-builder /app/.next/server/app /app/frontend/.next/server/app
-# 4. Copy public assets
+# 2. Copy complete .next directory (ensures all manifests are present)
+COPY --from=frontend-builder /app/.next /app/frontend/.next
+# 3. Copy public assets
 COPY --from=frontend-builder /app/public /app/frontend/public
 
 # Create necessary directories

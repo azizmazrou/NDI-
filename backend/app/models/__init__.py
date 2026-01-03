@@ -5,6 +5,7 @@ from app.models.assessment import Assessment, AssessmentResponse
 from app.models.evidence import Evidence
 from app.models.user import User
 from app.models.embedding import Embedding
+from app.models.settings import Setting, AIProviderConfig, SettingCategory
 
 __all__ = [
     "Organization",
@@ -17,4 +18,7 @@ __all__ = [
     "Evidence",
     "User",
     "Embedding",
+    "Setting",
+    "AIProviderConfig",
+    "SettingCategory",
 ]

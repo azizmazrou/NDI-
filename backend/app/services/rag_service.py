@@ -72,7 +72,7 @@ class RAGService:
                 "id": str(row.source_id),
                 "content": row.content,
                 "similarity": row.similarity,
-                "metadata": row.metadata,
+                "metadata": row.extra_metadata,
             })
             if row.content:
                 context_parts.append(row.content)
@@ -302,7 +302,7 @@ class RAGService:
                 embedding.embedding_en = embedding_en
             if embedding_ar:
                 embedding.embedding_ar = embedding_ar
-            embedding.metadata = metadata
+            embedding.extra_metadata = metadata
         else:
             # Create new
             new_embedding = Embedding(
@@ -312,6 +312,6 @@ class RAGService:
                 content_ar=content_ar,
                 embedding_en=embedding_en,
                 embedding_ar=embedding_ar,
-                metadata=metadata,
+                extra_metadata=metadata,
             )
             self.db.add(new_embedding)

@@ -27,7 +27,7 @@ class Embedding(Base):
     content_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     embedding_en = mapped_column(Vector(settings.embedding_dimension), nullable=True)
     embedding_ar = mapped_column(Vector(settings.embedding_dimension), nullable=True)
-    metadata: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    extra_metadata: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     def __repr__(self) -> str:
         return f"<Embedding(id={self.id}, source_type={self.source_type})>"

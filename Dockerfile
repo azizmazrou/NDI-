@@ -44,9 +44,10 @@ COPY frontend/ ./
 ARG NEXT_PUBLIC_API_URL=/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
 
-# Build Next.js app
-RUN npm run build
+# Clean any cache and build Next.js app
+RUN rm -rf .next && npm run build
 
 # -----------------------------------------------------------------------------
 # Stage 3: Production Image - مرحلة الإنتاج

@@ -8,22 +8,27 @@ from sqlalchemy.pool import NullPool
 
 from app.config import settings
 
-# Convert sync URL to async and disable SSL if not specified
-DATABASE_URL = settings.database_url.replace(
-    "postgresql://", "postgresql+asyncpg://"
-)
+# Convert sync URL to async if needed
+DATABASE_URL = settings.database_url
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
-# Add sslmode=disable if not already specified to avoid permission issues
-if "sslmode" not in DATABASE_URL and "ssl" not in DATABASE_URL:
-    DATABASE_URL = DATABASE_URL + ("&" if "?" in DATABASE_URL else "?") + "ssl=disable"
+# Remove any ssl parameters from URL (we'll handle via connect_args)
+for ssl_param in ["?ssl=disable", "&ssl=disable", "?sslmode=disable", "&sslmode=disable"]:
+    DATABASE_URL = DATABASE_URL.replace(ssl_param, "")
 
-# Create async engine
+# Create async engine with SSL disabled via connect_args (correct for asyncpg)
 engine = create_async_engine(
     DATABASE_URL,
     echo=settings.debug,
     poolclass=NullPool if settings.app_env == "testing" else None,
     pool_size=settings.database_pool_size if settings.app_env != "testing" else None,
     max_overflow=settings.database_max_overflow if settings.app_env != "testing" else None,
+    connect_args={
+        "ssl": False,  # Disable SSL for asyncpg
+        "timeout": 30,  # Connection timeout in seconds
+        "command_timeout": 60,  # Command timeout in seconds
+    },
 )
 
 # Create async session factory

@@ -74,10 +74,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY --chown=appuser:appuser backend/ /app/backend/
 COPY --chown=appuser:appuser data/ /app/data/
 
-# Copy frontend build
+# Copy frontend build - standalone + complete .next for App Router support
 COPY --from=frontend-builder /app/.next/standalone /app/frontend/
-COPY --from=frontend-builder /app/.next/static /app/frontend/.next/static
-COPY --from=frontend-builder /app/.next/server /app/frontend/.next/server
+COPY --from=frontend-builder /app/.next /app/frontend/.next
 COPY --from=frontend-builder /app/public /app/frontend/public
 
 # Create necessary directories
@@ -93,7 +92,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     APP_ENV=production \
     NODE_ENV=production \
-    PORT=3388
+    PORT=3388 \
+    PGSSLMODE=disable
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \

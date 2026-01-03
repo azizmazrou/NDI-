@@ -25,14 +25,10 @@ router = APIRouter()
 
 @router.get("/domains", response_model=NDIDomainList)
 async def list_domains(
-    include_oe: bool = Query(True, description="Include Operational Excellence domains"),
     db: AsyncSession = Depends(get_db),
 ):
     """List all NDI domains."""
     query = select(NDIDomain).order_by(NDIDomain.sort_order)
-
-    if not include_oe:
-        query = query.where(NDIDomain.is_oe_domain == False)
 
     result = await db.execute(query)
     domains = result.scalars().all()
@@ -70,7 +66,8 @@ async def get_domain(
         description_en=domain.description_en,
         description_ar=domain.description_ar,
         question_count=domain.question_count,
-        is_oe_domain=domain.is_oe_domain,
+        icon=domain.icon,
+        color=domain.color,
         sort_order=domain.sort_order,
         questions=[
             NDIQuestionWithLevels(

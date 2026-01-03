@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models.organization import Organization
 from app.models.assessment import Assessment, AssessmentResponse as AssessmentResponseModel
 from app.models.ndi import NDIDomain, NDIQuestion
 from app.schemas.assessment import (
@@ -23,9 +22,9 @@ from app.schemas.assessment import (
     AssessmentReport,
     DomainScore,
 )
-from app.schemas.organization import OrganizationResponse
 from app.schemas.ndi import NDIDomainResponse, NDIQuestionWithLevels, NDIMaturityLevelResponse
 from app.services.assessment_service import AssessmentService
+from app.services.score_service import ScoreService
 
 router = APIRouter()
 
@@ -63,16 +62,13 @@ def score_to_level(score: float) -> int:
 async def list_assessments(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    organization_id: Optional[UUID] = None,
     assessment_type: Optional[str] = None,
     status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """List assessments with pagination and filtering."""
-    query = select(Assessment).options(selectinload(Assessment.organization))
+    query = select(Assessment)
 
-    if organization_id:
-        query = query.where(Assessment.organization_id == organization_id)
     if assessment_type:
         query = query.where(Assessment.assessment_type == assessment_type)
     if status:
@@ -106,20 +102,18 @@ async def list_assessments(
         items.append(
             AssessmentResponse(
                 id=a.id,
-                organization_id=a.organization_id,
                 assessment_type=a.assessment_type,
                 status=a.status,
                 name=a.name,
                 description=a.description,
                 target_level=a.target_level,
                 current_score=a.current_score,
+                maturity_score=a.maturity_score,
+                compliance_score=a.compliance_score,
                 created_by=a.created_by,
                 created_at=a.created_at,
                 updated_at=a.updated_at,
                 completed_at=a.completed_at,
-                organization=OrganizationResponse.model_validate(a.organization)
-                if a.organization
-                else None,
                 responses_count=responses_count,
                 progress_percentage=(responses_count / total_questions) * 100
                 if total_questions > 0
@@ -141,13 +135,6 @@ async def create_assessment(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new assessment."""
-    # Verify organization exists
-    org_result = await db.execute(
-        select(Organization).where(Organization.id == data.organization_id)
-    )
-    if not org_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Organization not found")
-
     assessment = Assessment(**data.model_dump())
     db.add(assessment)
     await db.flush()
@@ -155,13 +142,14 @@ async def create_assessment(
 
     return AssessmentResponse(
         id=assessment.id,
-        organization_id=assessment.organization_id,
         assessment_type=assessment.assessment_type,
         status=assessment.status,
         name=assessment.name,
         description=assessment.description,
         target_level=assessment.target_level,
         current_score=assessment.current_score,
+        maturity_score=assessment.maturity_score,
+        compliance_score=assessment.compliance_score,
         created_by=assessment.created_by,
         created_at=assessment.created_at,
         updated_at=assessment.updated_at,
@@ -178,9 +166,7 @@ async def get_assessment(
 ):
     """Get assessment by ID."""
     result = await db.execute(
-        select(Assessment)
-        .options(selectinload(Assessment.organization))
-        .where(Assessment.id == assessment_id)
+        select(Assessment).where(Assessment.id == assessment_id)
     )
     assessment = result.scalar_one_or_none()
 
@@ -201,20 +187,18 @@ async def get_assessment(
 
     return AssessmentResponse(
         id=assessment.id,
-        organization_id=assessment.organization_id,
         assessment_type=assessment.assessment_type,
         status=assessment.status,
         name=assessment.name,
         description=assessment.description,
         target_level=assessment.target_level,
         current_score=assessment.current_score,
+        maturity_score=assessment.maturity_score,
+        compliance_score=assessment.compliance_score,
         created_by=assessment.created_by,
         created_at=assessment.created_at,
         updated_at=assessment.updated_at,
         completed_at=assessment.completed_at,
-        organization=OrganizationResponse.model_validate(assessment.organization)
-        if assessment.organization
-        else None,
         responses_count=responses_count,
         progress_percentage=(responses_count / total_questions) * 100
         if total_questions > 0
@@ -281,13 +265,16 @@ async def submit_assessment(
     if not assessment:
         raise HTTPException(status_code=404, detail="Assessment not found")
 
-    # Calculate score
-    service = AssessmentService(db)
-    score = await service.calculate_score(assessment_id)
+    # Calculate scores using ScoreService
+    score_service = ScoreService(db)
+    maturity = await score_service.calculate_maturity_score(assessment_id)
+    compliance = await score_service.calculate_compliance_score(assessment_id)
 
     assessment.status = "completed"
     assessment.completed_at = datetime.utcnow()
-    assessment.current_score = score
+    assessment.current_score = maturity.overall_score
+    assessment.maturity_score = maturity.overall_score
+    assessment.compliance_score = compliance.compliance_percentage
 
     await db.flush()
     await db.refresh(assessment)

@@ -3,7 +3,9 @@ Settings Model - نموذج الإعدادات
 Stores application settings including API keys (encrypted)
 """
 
-from sqlalchemy import Column, String, Text, Boolean, DateTime, Enum as SQLEnum
+import uuid
+from sqlalchemy import Column, String, Text, Boolean, DateTime, Enum as SQLEnum, Integer
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from datetime import datetime
 import enum
@@ -17,6 +19,33 @@ class SettingCategory(str, enum.Enum):
     STORAGE = "storage"
     NOTIFICATION = "notification"
     GENERAL = "general"
+
+
+class OrganizationSettings(Base):
+    """
+    Organization Settings - إعدادات الجهة الواحدة
+    Single organization model (replaces multi-organization)
+    """
+    __tablename__ = "organization_settings"
+
+    id: int = Column(Integer, primary_key=True, default=1)
+    name_en: str = Column(String(255), nullable=False, default="Organization")
+    name_ar: str = Column(String(255), nullable=False, default="الجهة")
+    sector_en: str = Column(String(100), nullable=True)
+    sector_ar: str = Column(String(100), nullable=True)
+    description_en: str = Column(String(1000), nullable=True)
+    description_ar: str = Column(String(1000), nullable=True)
+    logo_url: str = Column(String(500), nullable=True)
+    website: str = Column(String(255), nullable=True)
+    address_en: str = Column(String(500), nullable=True)
+    address_ar: str = Column(String(500), nullable=True)
+    contact_email: str = Column(String(255), nullable=True)
+    contact_phone: str = Column(String(50), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    def __repr__(self):
+        return f"<OrganizationSettings {self.name_en}>"
 
 
 class Setting(Base):

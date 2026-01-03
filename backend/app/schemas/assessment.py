@@ -1,22 +1,21 @@
 """Assessment schemas."""
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional, Any, List
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 from app.schemas.ndi import NDIQuestionWithLevels, NDIDomainResponse
-from app.schemas.organization import OrganizationResponse
 
 
 class AssessmentCreate(BaseModel):
     """Schema for creating an assessment."""
 
-    organization_id: UUID
-    assessment_type: str = Field(default="maturity", pattern="^(maturity|compliance|oe)$")
+    assessment_type: str = Field(default="maturity", pattern="^(maturity|compliance)$")
     name: Optional[str] = Field(None, max_length=255)
     description: Optional[str] = None
     target_level: Optional[int] = Field(None, ge=0, le=5)
+    created_by: Optional[UUID] = None
 
 
 class AssessmentUpdate(BaseModel):
@@ -80,18 +79,18 @@ class AssessmentResponse(BaseModel):
     """Schema for assessment response."""
 
     id: UUID
-    organization_id: UUID
     assessment_type: str
     status: str
     name: Optional[str] = None
     description: Optional[str] = None
     target_level: Optional[int] = None
     current_score: Optional[float] = None
+    maturity_score: Optional[float] = None
+    compliance_score: Optional[float] = None
     created_by: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
     completed_at: Optional[datetime] = None
-    organization: Optional[OrganizationResponse] = None
     responses_count: int = 0
     progress_percentage: float = 0.0
 

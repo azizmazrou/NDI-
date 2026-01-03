@@ -3,22 +3,18 @@
 # نظام الامتثال لمؤشر البيانات الوطني - ملف Make
 # =============================================================================
 
-.PHONY: help dev prod build clean logs shell seed migrate backup
+.PHONY: help dev build clean logs shell seed migrate backup
 
 # Default target
 help:
 	@echo "NDI Compliance System - Docker Commands"
 	@echo "نظام الامتثال لمؤشر البيانات الوطني - أوامر Docker"
 	@echo ""
-	@echo "Development / التطوير:"
-	@echo "  make dev          - Start development environment / بدء بيئة التطوير"
-	@echo "  make dev-build    - Build and start dev environment / بناء وبدء بيئة التطوير"
-	@echo "  make dev-down     - Stop development environment / إيقاف بيئة التطوير"
-	@echo ""
-	@echo "Production / الإنتاج:"
-	@echo "  make prod         - Start production environment / بدء بيئة الإنتاج"
-	@echo "  make prod-build   - Build and start production / بناء وبدء الإنتاج"
-	@echo "  make prod-down    - Stop production environment / إيقاف بيئة الإنتاج"
+	@echo "Main Commands / الأوامر الرئيسية:"
+	@echo "  make up           - Start all services / بدء جميع الخدمات"
+	@echo "  make up-build     - Build and start / بناء وبدء"
+	@echo "  make down         - Stop all services / إيقاف جميع الخدمات"
+	@echo "  make restart      - Restart all services / إعادة تشغيل الخدمات"
 	@echo ""
 	@echo "Database / قاعدة البيانات:"
 	@echo "  make migrate      - Run database migrations / تشغيل ترحيل قاعدة البيانات"
@@ -27,52 +23,37 @@ help:
 	@echo ""
 	@echo "Utilities / أدوات مساعدة:"
 	@echo "  make logs         - View all logs / عرض جميع السجلات"
-	@echo "  make shell-back   - Shell into backend / الدخول للخلفية"
-	@echo "  make shell-front  - Shell into frontend / الدخول للواجهة"
+	@echo "  make shell        - Shell into app / الدخول للتطبيق"
+	@echo "  make shell-db     - Shell into database / الدخول لقاعدة البيانات"
 	@echo "  make clean        - Clean Docker resources / تنظيف موارد Docker"
 	@echo "  make status       - Show service status / عرض حالة الخدمات"
+	@echo "  make health       - Check service health / فحص صحة الخدمات"
 
 # =============================================================================
-# Development Commands / أوامر التطوير
+# Main Commands / الأوامر الرئيسية
 # =============================================================================
 
-dev:
+up:
 	docker-compose up -d
 
-dev-build:
+up-build:
 	docker-compose up -d --build
 
-dev-down:
+down:
 	docker-compose down
 
-dev-restart:
+restart:
 	docker-compose restart
-
-# =============================================================================
-# Production Commands / أوامر الإنتاج
-# =============================================================================
-
-prod:
-	docker-compose -f docker-compose.prod.yml up -d
-
-prod-build:
-	docker-compose -f docker-compose.prod.yml up -d --build
-
-prod-down:
-	docker-compose -f docker-compose.prod.yml down
-
-prod-restart:
-	docker-compose -f docker-compose.prod.yml restart
 
 # =============================================================================
 # Database Commands / أوامر قاعدة البيانات
 # =============================================================================
 
 migrate:
-	docker-compose exec backend alembic upgrade head
+	docker-compose exec app /opt/venv/bin/alembic -c /app/backend/alembic.ini upgrade head
 
 seed:
-	docker-compose exec backend python -m app.scripts.seed_ndi_data
+	docker-compose exec app /opt/venv/bin/python -m app.scripts.seed_ndi_data
 
 backup:
 	@mkdir -p backups
@@ -89,17 +70,11 @@ restore:
 logs:
 	docker-compose logs -f
 
-logs-backend:
-	docker-compose logs -f backend
+logs-app:
+	docker-compose logs -f app
 
-logs-frontend:
-	docker-compose logs -f frontend
-
-shell-back:
-	docker-compose exec backend /bin/bash
-
-shell-front:
-	docker-compose exec frontend /bin/sh
+shell:
+	docker-compose exec app /bin/bash
 
 shell-db:
 	docker-compose exec postgres psql -U ndi_user -d ndi_db
@@ -109,8 +84,7 @@ status:
 
 health:
 	@echo "Checking service health... / فحص صحة الخدمات..."
-	@curl -s http://localhost:8000/health && echo " Backend OK ✓" || echo " Backend FAIL ✗"
-	@curl -s http://localhost:3000 > /dev/null && echo " Frontend OK ✓" || echo " Frontend FAIL ✗"
+	@curl -s http://localhost/health && echo " App OK ✓" || echo " App FAIL ✗"
 	@docker-compose exec -T postgres pg_isready -U ndi_user -d ndi_db > /dev/null && echo " Database OK ✓" || echo " Database FAIL ✗"
 	@docker-compose exec -T redis redis-cli ping > /dev/null && echo " Redis OK ✓" || echo " Redis FAIL ✗"
 
@@ -136,9 +110,3 @@ build:
 
 build-no-cache:
 	docker-compose build --no-cache
-
-build-backend:
-	docker-compose build backend
-
-build-frontend:
-	docker-compose build frontend

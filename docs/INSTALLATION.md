@@ -165,9 +165,8 @@ curl -I http://localhost:3000
 ### From GitHub Container Registry / من سجل حاويات GitHub
 
 ```bash
-# Pull pre-built images / سحب الصور الجاهزة
-docker pull ghcr.io/azizmazrou/ndi-compliance-backend:latest
-docker pull ghcr.io/azizmazrou/ndi-compliance-frontend:latest
+# Pull pre-built image / سحب الصورة الجاهزة
+docker pull ghcr.io/azizmazrou/ndi-compliance-system:latest
 ```
 
 ### Create docker-compose.override.yml / إنشاء ملف التجاوز
@@ -177,12 +176,8 @@ docker pull ghcr.io/azizmazrou/ndi-compliance-frontend:latest
 version: '3.8'
 
 services:
-  backend:
-    image: ghcr.io/azizmazrou/ndi-compliance-backend:latest
-    build: !reset null
-
-  frontend:
-    image: ghcr.io/azizmazrou/ndi-compliance-frontend:latest
+  app:
+    image: ghcr.io/azizmazrou/ndi-compliance-system:latest
     build: !reset null
 ```
 
@@ -399,15 +394,14 @@ make health
 ### Upgrade with Pre-built Images / الترقية بالصور الجاهزة
 
 ```bash
-# Pull latest images / سحب أحدث الصور
-docker pull ghcr.io/azizmazrou/ndi-compliance-backend:latest
-docker pull ghcr.io/azizmazrou/ndi-compliance-frontend:latest
+# Pull latest image / سحب أحدث الصورة
+docker pull ghcr.io/azizmazrou/ndi-compliance-system:latest
 
 # Restart services / إعادة تشغيل الخدمات
-docker-compose up -d --force-recreate backend frontend
+docker-compose up -d --force-recreate app
 
 # Run migrations / تشغيل الترحيلات
-docker-compose exec backend alembic upgrade head
+docker-compose exec app /opt/venv/bin/alembic -c /app/backend/alembic.ini upgrade head
 ```
 
 ### Rollback / التراجع

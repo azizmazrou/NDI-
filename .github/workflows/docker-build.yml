@@ -3,7 +3,7 @@
 # نظام الامتثال لمؤشر البيانات الوطني - سير عمل بناء ونشر Docker
 # =============================================================================
 
-name: Build and Publish Docker Images
+name: Build and Publish Docker Image
 
 on:
   push:
@@ -14,26 +14,17 @@ on:
       - 'v*'
   pull_request:
   workflow_dispatch:
-    inputs:
-      push_images:
-        description: 'Push images to registry'
-        required: false
-        default: 'false'
-        type: boolean
 
 env:
   REGISTRY: ghcr.io
-  # Use repository owner for image namespace (avoids issues with repo names ending in hyphen)
-  IMAGE_NAMESPACE: ${{ github.repository_owner }}
-  BACKEND_IMAGE_NAME: ndi-compliance-backend
-  FRONTEND_IMAGE_NAME: ndi-compliance-frontend
+  IMAGE_NAME: ${{ github.repository_owner }}/ndi-compliance-system
 
 jobs:
   # ===========================================================================
-  # Build Backend Image
+  # Build Unified Docker Image
   # ===========================================================================
-  build-backend:
-    name: Build Backend Image
+  build:
+    name: Build Docker Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -62,11 +53,11 @@ jobs:
           BRANCH_NAME="${BRANCH_NAME//[^a-zA-Z0-9._-]/}"
           echo "branch_tag=${BRANCH_NAME}" >> $GITHUB_OUTPUT
 
-      - name: Extract metadata for Backend
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.BACKEND_IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -74,85 +65,24 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=${{ steps.sanitize.outputs.branch_tag }},enable=${{ github.event_name != 'pull_request' }}
 
-      - name: Build and push Backend image
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          target: production
+          context: .
+          file: ./Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
-
-  # ===========================================================================
-  # Build Frontend Image
-  # ===========================================================================
-  build-frontend:
-    name: Build Frontend Image
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Sanitize branch name
-        id: sanitize
-        run: |
-          # Sanitize branch name for Docker tag (replace / with -, remove invalid chars)
-          BRANCH_NAME="${GITHUB_REF_NAME//\//-}"
-          BRANCH_NAME="${BRANCH_NAME//[^a-zA-Z0-9._-]/}"
-          echo "branch_tag=${BRANCH_NAME}" >> $GITHUB_OUTPUT
-
-      - name: Extract metadata for Frontend
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.FRONTEND_IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=sha-
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=raw,value=${{ steps.sanitize.outputs.branch_tag }},enable=${{ github.event_name != 'pull_request' }}
-
-      - name: Build and push Frontend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          target: production
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
-          build-args: |
-            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || '/api/v1' }}
+          platforms: linux/amd64
 
   # ===========================================================================
   # Create Release
   # ===========================================================================
   release:
     name: Create Release
-    needs: [build-backend, build-frontend]
+    needs: [build]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -167,12 +97,25 @@ jobs:
         with:
           generate_release_notes: true
           body: |
-            ## Docker Images / صور Docker
+            ## Docker Image / صورة Docker
 
-            Pull the images:
+            Pull the image:
             ```bash
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.BACKEND_IMAGE_NAME }}:${{ github.ref_name }}
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ github.ref_name }}
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+            ```
+
+            ## Quick Start / البدء السريع
+
+            ```bash
+            # Clone the repository
+            git clone https://github.com/${{ github.repository }}.git
+            cd $(basename ${{ github.repository }})
+
+            # Copy environment file
+            cp .env.example .env
+
+            # Start with Docker Compose
+            docker-compose up -d
             ```
 
             ## Installation / التثبيت

@@ -135,7 +135,7 @@ export default function DashboardPage() {
                   : "Recently created assessments"}
               </CardDescription>
             </div>
-            <Link href={`/${locale}/assessments`}>
+            <Link href={`/${locale}/dashboard/assessments`}>
               <Button variant="ghost" size="sm">
                 {t("common.view")}
                 <Arrow className="ms-2 h-4 w-4" />
@@ -188,19 +188,19 @@ export default function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Link href={`/${locale}/assessments/new`} className="block">
+            <Link href={`/${locale}/dashboard/assessments/new`} className="block">
               <Button className="w-full justify-start" size="lg">
                 <Plus className="me-2 h-5 w-5" />
                 {t("dashboard.startAssessment")}
               </Button>
             </Link>
-            <Link href={`/${locale}/reports`} className="block">
+            <Link href={`/${locale}/dashboard/reports`} className="block">
               <Button variant="outline" className="w-full justify-start" size="lg">
                 <FileBarChart className="me-2 h-5 w-5" />
                 {t("dashboard.viewReports")}
               </Button>
             </Link>
-            <Link href={`/${locale}/organizations`} className="block">
+            <Link href={`/${locale}/dashboard/organizations`} className="block">
               <Button variant="outline" className="w-full justify-start" size="lg">
                 <Building2 className="me-2 h-5 w-5" />
                 {t("organization.organizations")}

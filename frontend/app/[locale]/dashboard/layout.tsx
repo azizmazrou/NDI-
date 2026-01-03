@@ -44,22 +44,22 @@ export default function DashboardLayout({
       label: t("nav.dashboard"),
     },
     {
-      href: `/${locale}/assessments`,
+      href: `/${locale}/dashboard/assessments`,
       icon: <ClipboardCheck className="h-5 w-5" />,
       label: t("nav.assessments"),
     },
     {
-      href: `/${locale}/organizations`,
+      href: `/${locale}/dashboard/organizations`,
       icon: <Building2 className="h-5 w-5" />,
       label: t("nav.organizations"),
     },
     {
-      href: `/${locale}/reports`,
+      href: `/${locale}/dashboard/reports`,
       icon: <FileBarChart className="h-5 w-5" />,
       label: t("nav.reports"),
     },
     {
-      href: `/${locale}/settings`,
+      href: `/${locale}/dashboard/settings`,
       icon: <Settings className="h-5 w-5" />,
       label: t("nav.settings"),
     },
@@ -140,7 +140,7 @@ export default function DashboardLayout({
         {/* Footer */}
         <div className="border-t p-4 space-y-2">
           <Link
-            href={`/${locale}/help`}
+            href={`/${locale}/dashboard/help`}
             className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <HelpCircle className="h-5 w-5" />

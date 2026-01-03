@@ -6,6 +6,9 @@ import "@/styles/globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
+// Force dynamic rendering - prevents static generation issues during build
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "NDI Compliance System | نظام الامتثال لمؤشر البيانات الوطني",
   description:
@@ -13,10 +16,6 @@ export const metadata = {
 };
 
 const locales = ["en", "ar"];
-
-export function generateStaticParams() {
-  return locales.map((locale) => ({ locale }));
-}
 
 interface RootLayoutProps {
   children: React.ReactNode;

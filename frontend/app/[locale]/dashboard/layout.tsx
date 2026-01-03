@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   ClipboardCheck,
-  Building2,
+  ListTodo,
   FileBarChart,
   Settings,
   HelpCircle,
@@ -49,9 +49,9 @@ export default function DashboardLayout({
       label: t("nav.assessments"),
     },
     {
-      href: `/${locale}/dashboard/organizations`,
-      icon: <Building2 className="h-5 w-5" />,
-      label: t("nav.organizations"),
+      href: `/${locale}/dashboard/tasks`,
+      icon: <ListTodo className="h-5 w-5" />,
+      label: t("nav.tasks"),
     },
     {
       href: `/${locale}/dashboard/reports`,

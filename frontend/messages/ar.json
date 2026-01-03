@@ -33,12 +33,14 @@
     "type": "النوع",
     "language": "اللغة",
     "arabic": "العربية",
-    "english": "الإنجليزية"
+    "english": "الإنجليزية",
+    "assign": "تعيين",
+    "dueDate": "تاريخ الاستحقاق"
   },
   "nav": {
     "dashboard": "لوحة التحكم",
     "assessments": "التقييمات",
-    "organizations": "الجهات",
+    "tasks": "المهام",
     "reports": "التقارير",
     "settings": "الإعدادات",
     "domains": "مجالات المؤشر",
@@ -56,21 +58,31 @@
     "loginSuccess": "تم تسجيل الدخول بنجاح",
     "loginError": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
     "registerSuccess": "تم التسجيل بنجاح",
-    "logoutSuccess": "تم تسجيل الخروج بنجاح"
+    "logoutSuccess": "تم تسجيل الخروج بنجاح",
+    "fullName": "الاسم الكامل",
+    "department": "القسم",
+    "jobTitle": "المسمى الوظيفي",
+    "phone": "رقم الهاتف"
   },
   "dashboard": {
     "title": "لوحة التحكم",
     "welcome": "مرحباً بك في نظام الامتثال لمؤشر البيانات الوطني",
-    "overview": "نظرة عامة",
+    "overview": "نظرة عامة على التقييمات والمهام",
     "recentAssessments": "التقييمات الأخيرة",
     "quickActions": "إجراءات سريعة",
     "startAssessment": "بدء تقييم جديد",
     "viewReports": "عرض التقارير",
     "totalAssessments": "إجمالي التقييمات",
+    "activeAssessments": "التقييمات النشطة",
     "completedAssessments": "المكتملة",
     "inProgressAssessments": "قيد التنفيذ",
-    "averageScore": "متوسط الدرجة",
-    "organizationsCount": "عدد الجهات"
+    "averageMaturityScore": "متوسط درجة النضج",
+    "averageComplianceScore": "متوسط درجة الامتثال",
+    "totalTasks": "إجمالي المهام",
+    "pendingTasks": "المهام المعلقة",
+    "overdueTasks": "المهام المتأخرة",
+    "myTasks": "مهامي",
+    "viewAllTasks": "عرض كل المهام"
   },
   "assessment": {
     "title": "التقييم",
@@ -78,13 +90,13 @@
     "newAssessment": "تقييم جديد",
     "maturityAssessment": "تقييم النضج",
     "complianceAssessment": "تقييم الامتثال",
-    "operationalExcellence": "التميز التشغيلي",
-    "selectOrganization": "اختر الجهة",
     "selectType": "اختر نوع التقييم",
     "targetLevel": "المستوى المستهدف",
     "currentLevel": "المستوى الحالي",
     "progress": "التقدم",
     "score": "الدرجة",
+    "maturityScore": "درجة النضج",
+    "complianceScore": "درجة الامتثال",
     "selectLevel": "اختر مستوى النضج",
     "uploadEvidence": "رفع الشواهد",
     "analyzeEvidence": "تحليل الشواهد",
@@ -101,7 +113,37 @@
     "evidence": "الشواهد",
     "noEvidence": "لم يتم رفع شواهد",
     "justification": "المبرر",
-    "notes": "ملاحظات"
+    "notes": "ملاحظات",
+    "assignTask": "تعيين مهمة"
+  },
+  "task": {
+    "title": "المهمة",
+    "tasks": "المهام",
+    "newTask": "مهمة جديدة",
+    "myTasks": "مهامي",
+    "assignedTasks": "المهام المعينة لي",
+    "assignedByMe": "المهام التي عينتها",
+    "assignTo": "تعيين إلى",
+    "assignedBy": "معين من قبل",
+    "dueDate": "تاريخ الاستحقاق",
+    "priority": "الأولوية",
+    "urgent": "عاجل",
+    "high": "عالية",
+    "medium": "متوسطة",
+    "low": "منخفضة",
+    "status": "الحالة",
+    "pending": "معلقة",
+    "inProgress": "قيد التنفيذ",
+    "completed": "مكتملة",
+    "overdue": "متأخرة",
+    "startTask": "بدء المهمة",
+    "completeTask": "إكمال المهمة",
+    "taskCompleted": "تم إكمال المهمة",
+    "noTasks": "لا توجد مهام",
+    "allTasksCompleted": "تم إكمال جميع المهام",
+    "taskDescription": "وصف المهمة",
+    "relatedQuestion": "السؤال المرتبط",
+    "relatedDomain": "المجال المرتبط"
   },
   "levels": {
     "0": "غياب القدرات",
@@ -127,15 +169,18 @@
     "DC": "تصنيف البيانات",
     "PDP": "حماية البيانات الشخصية"
   },
-  "organization": {
-    "title": "الجهة",
-    "organizations": "الجهات",
-    "newOrganization": "جهة جديدة",
+  "settings": {
+    "title": "الإعدادات",
+    "organizationSettings": "إعدادات الجهة",
     "nameEn": "الاسم (بالإنجليزية)",
     "nameAr": "الاسم (بالعربية)",
     "sector": "القطاع",
     "website": "الموقع الإلكتروني",
-    "logo": "الشعار"
+    "logo": "الشعار",
+    "contactEmail": "البريد الإلكتروني للتواصل",
+    "contactPhone": "رقم الهاتف للتواصل",
+    "address": "العنوان",
+    "description": "الوصف"
   },
   "report": {
     "title": "التقرير",
@@ -145,6 +190,8 @@
     "gapAnalysis": "تحليل الفجوات",
     "recommendations": "التوصيات",
     "overallScore": "الدرجة الإجمالية",
+    "maturityScore": "درجة النضج",
+    "complianceScore": "درجة الامتثال",
     "domainScores": "درجات المجالات",
     "exportPdf": "تصدير PDF",
     "exportExcel": "تصدير Excel",
@@ -155,7 +202,9 @@
     "low": "منخفضة",
     "actionsRequired": "الإجراءات المطلوبة",
     "quickWins": "المكاسب السريعة",
-    "criticalActions": "الإجراءات الحرجة"
+    "criticalActions": "الإجراءات الحرجة",
+    "selectAssessment": "اختر التقييم",
+    "downloadReport": "تحميل التقرير"
   },
   "evidence": {
     "title": "الشواهد",
@@ -171,7 +220,10 @@
     "coveredCriteria": "المعايير المغطاة",
     "missingCriteria": "المعايير المفقودة",
     "aiRecommendations": "توصيات الذكاء الاصطناعي",
-    "confidenceScore": "درجة الثقة"
+    "confidenceScore": "درجة الثقة",
+    "acceptanceCriteria": "معايير القبول",
+    "suggestStructure": "اقتراح هيكل الدليل",
+    "quickCheck": "فحص سريع"
   },
   "ai": {
     "title": "المساعد الذكي",
@@ -186,7 +238,8 @@
     "archived": "مؤرشف",
     "pending": "قيد الانتظار",
     "processing": "قيد المعالجة",
-    "failed": "فشل"
+    "failed": "فشل",
+    "overdue": "متأخر"
   },
   "validation": {
     "required": "هذا الحقل مطلوب",

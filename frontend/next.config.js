@@ -4,9 +4,6 @@ const withNextIntl = require("next-intl/plugin")();
 const nextConfig = {
   reactStrictMode: true,
 
-  // Enable standalone output for Docker production
-  output: "standalone",
-
   images: {
     domains: ["localhost"],
     remotePatterns: [

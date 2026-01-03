@@ -8,19 +8,22 @@ from sqlalchemy.pool import NullPool
 
 from app.config import settings
 
-# Convert sync URL to async
+# Convert sync URL to async and disable SSL if not specified
 DATABASE_URL = settings.database_url.replace(
     "postgresql://", "postgresql+asyncpg://"
 )
 
-# Create async engine with SSL disabled by default for container compatibility
+# Add sslmode=disable if not already specified to avoid permission issues
+if "sslmode" not in DATABASE_URL and "ssl" not in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL + ("&" if "?" in DATABASE_URL else "?") + "ssl=disable"
+
+# Create async engine
 engine = create_async_engine(
     DATABASE_URL,
     echo=settings.debug,
     poolclass=NullPool if settings.app_env == "testing" else None,
     pool_size=settings.database_pool_size if settings.app_env != "testing" else None,
     max_overflow=settings.database_max_overflow if settings.app_env != "testing" else None,
-    connect_args={"ssl": None} if "sslmode" not in DATABASE_URL else {},
 )
 
 # Create async session factory

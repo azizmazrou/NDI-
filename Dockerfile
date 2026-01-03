@@ -74,14 +74,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY --chown=appuser:appuser backend/ /app/backend/
 COPY --chown=appuser:appuser data/ /app/data/
 
-# Copy frontend build - Full Next.js build (no standalone)
-COPY --from=frontend-builder /app/.next /app/frontend/.next
-COPY --from=frontend-builder /app/public /app/frontend/public
-COPY --from=frontend-builder /app/node_modules /app/frontend/node_modules
-COPY --from=frontend-builder /app/package.json /app/frontend/package.json
-COPY --from=frontend-builder /app/next.config.js /app/frontend/next.config.js
-COPY --from=frontend-builder /app/messages /app/frontend/messages
-COPY --from=frontend-builder /app/i18n.ts /app/frontend/i18n.ts
+# Copy frontend - entire build including source for next-intl compatibility
+COPY --from=frontend-builder /app /app/frontend
 
 # Create necessary directories
 RUN mkdir -p /app/uploads /app/logs /var/log/supervisor \

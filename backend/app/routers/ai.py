@@ -1,12 +1,14 @@
 """AI router."""
+from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.assessment import Assessment
+from app.models.assessment import Assessment, AssessmentResponse as AssessmentResponseModel
 from app.models.evidence import Evidence
 from app.schemas.ai import (
     EvidenceAnalyzeRequest,
@@ -20,8 +22,22 @@ from app.schemas.ai import (
 )
 from app.services.ai_service import AIService
 from app.services.evidence_service import EvidenceService
+from app.services.ai_evidence_service import AIEvidenceService
 
 router = APIRouter()
+
+
+# New request models
+class SuggestStructureRequest(BaseModel):
+    question_code: str
+    target_level: int
+    language: str = "ar"
+
+
+class QuickCheckRequest(BaseModel):
+    content: str
+    question_code: str
+    target_level: int
 
 
 @router.post("/analyze-evidence", response_model=EvidenceAnalyzeResponse)
@@ -116,4 +132,50 @@ async def chat(
         messages=data.messages,
         context=data.context,
         language=data.language,
+    )
+
+
+@router.post("/evidence/analyze-response")
+async def analyze_response_evidence(
+    response_id: UUID,
+    language: str = Query("ar"),
+    db: AsyncSession = Depends(get_db),
+):
+    """تحليل شواهد إجابة محددة."""
+    # Verify response exists
+    result = await db.execute(
+        select(AssessmentResponseModel).where(AssessmentResponseModel.id == response_id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Response not found")
+
+    service = AIEvidenceService(db)
+    return await service.analyze_evidence(response_id, language)
+
+
+@router.post("/evidence/suggest-structure")
+async def suggest_evidence_structure(
+    data: SuggestStructureRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """اقتراح هيكل الدليل المطلوب."""
+    service = AIEvidenceService(db)
+    return await service.suggest_evidence_structure(
+        question_code=data.question_code,
+        target_level=data.target_level,
+        language=data.language,
+    )
+
+
+@router.post("/evidence/quick-check")
+async def quick_check_evidence(
+    data: QuickCheckRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """فحص سريع للدليل."""
+    service = AIEvidenceService(db)
+    return await service.quick_check(
+        content=data.content,
+        question_code=data.question_code,
+        target_level=data.target_level,
     )

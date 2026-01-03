@@ -1,24 +1,46 @@
 """SQLAlchemy models."""
-from app.models.organization import Organization
-from app.models.ndi import NDIDomain, NDIQuestion, NDIMaturityLevel, NDISpecification
-from app.models.assessment import Assessment, AssessmentResponse
+from app.models.ndi import (
+    NDIDomain,
+    NDIQuestion,
+    NDIMaturityLevel,
+    NDIAcceptanceEvidence,
+    NDIEvidenceSpecificationMapping,
+    NDISpecification,
+)
+from app.models.assessment import Assessment, AssessmentResponse, AssessmentType, AssessmentStatus
 from app.models.evidence import Evidence
-from app.models.user import User
+from app.models.user import User, UserRole
+from app.models.task import Task, TaskStatus, TaskPriority
 from app.models.embedding import Embedding
-from app.models.settings import Setting, AIProviderConfig, SettingCategory
+from app.models.settings import Setting, AIProviderConfig, SettingCategory, OrganizationSettings
 
 __all__ = [
-    "Organization",
+    # NDI Models
     "NDIDomain",
     "NDIQuestion",
     "NDIMaturityLevel",
+    "NDIAcceptanceEvidence",
+    "NDIEvidenceSpecificationMapping",
     "NDISpecification",
+    # Assessment Models
     "Assessment",
     "AssessmentResponse",
+    "AssessmentType",
+    "AssessmentStatus",
+    # Evidence
     "Evidence",
+    # User Models
     "User",
+    "UserRole",
+    # Task Models
+    "Task",
+    "TaskStatus",
+    "TaskPriority",
+    # Embedding
     "Embedding",
+    # Settings Models
     "Setting",
     "AIProviderConfig",
     "SettingCategory",
+    "OrganizationSettings",
 ]

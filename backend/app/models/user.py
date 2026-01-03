@@ -12,6 +12,7 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.assessment import Assessment
+    from app.models.task import Task
 
 
 class UserRole(str, Enum):
@@ -36,9 +37,11 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), default=UserRole.ASSESSOR.value)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    organization_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )
+    department_en: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    department_ar: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    job_title_en: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    job_title_ar: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -52,6 +55,12 @@ class User(Base):
     # Relationships
     assessments: Mapped[List["Assessment"]] = relationship(
         "Assessment", back_populates="creator"
+    )
+    assigned_tasks: Mapped[List["Task"]] = relationship(
+        "Task", foreign_keys="Task.assigned_to", back_populates="assignee"
+    )
+    created_tasks: Mapped[List["Task"]] = relationship(
+        "Task", foreign_keys="Task.assigned_by", back_populates="assigner"
     )
 
     def __repr__(self) -> str:

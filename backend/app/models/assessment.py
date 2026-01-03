@@ -4,24 +4,23 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import String, Integer, Text, DateTime, ForeignKey, func
+from sqlalchemy import String, Integer, Text, DateTime, ForeignKey, func, Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.organization import Organization
     from app.models.ndi import NDIQuestion
     from app.models.evidence import Evidence
     from app.models.user import User
+    from app.models.task import Task
 
 
 class AssessmentType(str, Enum):
     """Assessment type enum."""
     MATURITY = "maturity"
     COMPLIANCE = "compliance"
-    OE = "oe"  # Operational Excellence
 
 
 class AssessmentStatus(str, Enum):
@@ -40,9 +39,6 @@ class Assessment(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False
-    )
     assessment_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default=AssessmentType.MATURITY.value
     )
@@ -52,7 +48,9 @@ class Assessment(Base):
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     target_level: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    current_score: Mapped[float | None] = mapped_column(Integer, nullable=True)
+    current_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    maturity_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    compliance_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
@@ -67,13 +65,13 @@ class Assessment(Base):
     )
 
     # Relationships
-    organization: Mapped["Organization"] = relationship(
-        "Organization", back_populates="assessments"
-    )
     responses: Mapped[List["AssessmentResponse"]] = relationship(
         "AssessmentResponse", back_populates="assessment", cascade="all, delete-orphan"
     )
     creator: Mapped[Optional["User"]] = relationship("User", back_populates="assessments")
+    tasks: Mapped[List["Task"]] = relationship(
+        "Task", back_populates="assessment", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Assessment(id={self.id}, type={self.assessment_type}, status={self.status})>"

@@ -166,8 +166,8 @@ curl -I http://localhost:3000
 
 ```bash
 # Pull pre-built images / سحب الصور الجاهزة
-docker pull ghcr.io/your-org/ndi-compliance-system/ndi-backend:latest
-docker pull ghcr.io/your-org/ndi-compliance-system/ndi-frontend:latest
+docker pull ghcr.io/azizmazrou/ndi-compliance-backend:latest
+docker pull ghcr.io/azizmazrou/ndi-compliance-frontend:latest
 ```
 
 ### Create docker-compose.override.yml / إنشاء ملف التجاوز
@@ -178,11 +178,11 @@ version: '3.8'
 
 services:
   backend:
-    image: ghcr.io/your-org/ndi-compliance-system/ndi-backend:latest
+    image: ghcr.io/azizmazrou/ndi-compliance-backend:latest
     build: !reset null
 
   frontend:
-    image: ghcr.io/your-org/ndi-compliance-system/ndi-frontend:latest
+    image: ghcr.io/azizmazrou/ndi-compliance-frontend:latest
     build: !reset null
 ```
 
@@ -400,8 +400,8 @@ make health
 
 ```bash
 # Pull latest images / سحب أحدث الصور
-docker pull ghcr.io/your-org/ndi-compliance-system/ndi-backend:latest
-docker pull ghcr.io/your-org/ndi-compliance-system/ndi-frontend:latest
+docker pull ghcr.io/azizmazrou/ndi-compliance-backend:latest
+docker pull ghcr.io/azizmazrou/ndi-compliance-frontend:latest
 
 # Restart services / إعادة تشغيل الخدمات
 docker-compose up -d --force-recreate backend frontend

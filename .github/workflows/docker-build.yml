@@ -25,8 +25,10 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE: ${{ github.repository }}/ndi-backend
-  FRONTEND_IMAGE: ${{ github.repository }}/ndi-frontend
+  # Use repository owner for image namespace (avoids issues with repo names ending in hyphen)
+  IMAGE_NAMESPACE: ${{ github.repository_owner }}
+  BACKEND_IMAGE_NAME: ndi-compliance-backend
+  FRONTEND_IMAGE_NAME: ndi-compliance-frontend
 
 jobs:
   # ===========================================================================
@@ -54,18 +56,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Sanitize branch name
+        id: sanitize
+        run: |
+          # Sanitize branch name for Docker tag (replace / with -, remove invalid chars)
+          BRANCH_NAME="${GITHUB_REF_NAME//\//-}"
+          BRANCH_NAME="${BRANCH_NAME//[^a-zA-Z0-9._-]/}"
+          echo "branch_tag=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+
       - name: Extract metadata for Backend
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.BACKEND_IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=
+            type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=${{ steps.sanitize.outputs.branch_tag }},enable=${{ github.event_name != 'pull_request' }}
 
       - name: Build and push Backend image
         uses: docker/build-push-action@v5
@@ -105,18 +114,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Sanitize branch name
+        id: sanitize
+        run: |
+          # Sanitize branch name for Docker tag (replace / with -, remove invalid chars)
+          BRANCH_NAME="${GITHUB_REF_NAME//\//-}"
+          BRANCH_NAME="${BRANCH_NAME//[^a-zA-Z0-9._-]/}"
+          echo "branch_tag=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+
       - name: Extract metadata for Frontend
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.FRONTEND_IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=
+            type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=${{ steps.sanitize.outputs.branch_tag }},enable=${{ github.event_name != 'pull_request' }}
 
       - name: Build and push Frontend image
         uses: docker/build-push-action@v5
@@ -157,8 +173,8 @@ jobs:
 
             Pull the images:
             ```bash
-            docker pull ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.ref_name }}
-            docker pull ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.ref_name }}
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.BACKEND_IMAGE_NAME }}:${{ github.ref_name }}
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ github.ref_name }}
             ```
 
             ## Installation / التثبيت

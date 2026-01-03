@@ -77,6 +77,7 @@ COPY --chown=appuser:appuser data/ /app/data/
 # Copy frontend build
 COPY --from=frontend-builder /app/.next/standalone /app/frontend/
 COPY --from=frontend-builder /app/.next/static /app/frontend/.next/static
+COPY --from=frontend-builder /app/.next/server /app/frontend/.next/server
 COPY --from=frontend-builder /app/public /app/frontend/public
 
 # Create necessary directories

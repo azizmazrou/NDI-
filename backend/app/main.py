@@ -1,4 +1,5 @@
 """FastAPI application entry point."""
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -10,6 +11,9 @@ from app.config import settings as app_settings
 from app.database import init_db, close_db
 from app.routers import organizations, assessments, ndi, evidence, ai
 from app.routers import settings as settings_router
+
+# Ensure uploads directory exists
+os.makedirs(app_settings.upload_dir, exist_ok=True)
 
 
 @asynccontextmanager

@@ -13,13 +13,14 @@ DATABASE_URL = settings.database_url.replace(
     "postgresql://", "postgresql+asyncpg://"
 )
 
-# Create async engine
+# Create async engine with SSL disabled by default for container compatibility
 engine = create_async_engine(
     DATABASE_URL,
     echo=settings.debug,
     poolclass=NullPool if settings.app_env == "testing" else None,
     pool_size=settings.database_pool_size if settings.app_env != "testing" else None,
     max_overflow=settings.database_max_overflow if settings.app_env != "testing" else None,
+    connect_args={"ssl": None} if "sslmode" not in DATABASE_URL else {},
 )
 
 # Create async session factory

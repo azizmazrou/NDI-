@@ -14,7 +14,8 @@ class NDIDomainBase(BaseModel):
     description_en: Optional[str] = None
     description_ar: Optional[str] = None
     question_count: Optional[int] = None
-    is_oe_domain: bool = False
+    icon: Optional[str] = None
+    color: Optional[str] = None
     sort_order: int = 0
 
 

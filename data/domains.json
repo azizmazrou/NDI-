@@ -6,7 +6,8 @@
     "description_en": "The exercise of authority and control over the management of data assets.",
     "description_ar": "ممارسة السلطة والسيطرة على إدارة أصول البيانات.",
     "question_count": 4,
-    "is_oe_domain": false,
+    "icon": "Shield",
+    "color": "#3B82F6",
     "sort_order": 1
   },
   {
@@ -16,7 +17,8 @@
     "description_en": "Planning, implementation, and control of activities to enable access to high quality, integrated metadata.",
     "description_ar": "تخطيط وتنفيذ ومراقبة الأنشطة لتمكين الوصول إلى البيانات الوصفية المتكاملة عالية الجودة.",
     "question_count": 3,
-    "is_oe_domain": false,
+    "icon": "Database",
+    "color": "#8B5CF6",
     "sort_order": 2
   },
   {
@@ -26,7 +28,8 @@
     "description_en": "Planning and implementation of quality management techniques to measure, assess, improve, and ensure the fitness of data for use.",
     "description_ar": "تخطيط وتنفيذ تقنيات إدارة الجودة لقياس وتقييم وتحسين وضمان ملاءمة البيانات للاستخدام.",
     "question_count": 4,
-    "is_oe_domain": false,
+    "icon": "CheckCircle",
+    "color": "#10B981",
     "sort_order": 3
   },
   {
@@ -36,7 +39,8 @@
     "description_en": "Planning, control, and support for structured data assets across the data lifecycle.",
     "description_ar": "تخطيط ومراقبة ودعم أصول البيانات المهيكلة عبر دورة حياة البيانات.",
     "question_count": 3,
-    "is_oe_domain": false,
+    "icon": "Server",
+    "color": "#F59E0B",
     "sort_order": 4
   },
   {
@@ -46,7 +50,8 @@
     "description_en": "Planning, implementation, and control of activities to store, protect, and access data in unstructured sources.",
     "description_ar": "تخطيط وتنفيذ ومراقبة الأنشطة لتخزين وحماية والوصول إلى البيانات في المصادر غير المهيكلة.",
     "question_count": 3,
-    "is_oe_domain": false,
+    "icon": "FileText",
+    "color": "#EC4899",
     "sort_order": 5
   },
   {
@@ -56,7 +61,8 @@
     "description_en": "Defining the blueprint for managing data assets by aligning with organizational strategy.",
     "description_ar": "تحديد المخطط لإدارة أصول البيانات من خلال المواءمة مع استراتيجية المنظمة.",
     "question_count": 2,
-    "is_oe_domain": false,
+    "icon": "Boxes",
+    "color": "#6366F1",
     "sort_order": 6
   },
   {
@@ -66,7 +72,8 @@
     "description_en": "Planning, implementation, and control of activities related to data integration and data interoperability.",
     "description_ar": "تخطيط وتنفيذ ومراقبة الأنشطة المتعلقة بتكامل البيانات وقابلية التشغيل البيني للبيانات.",
     "question_count": 4,
-    "is_oe_domain": false,
+    "icon": "Share2",
+    "color": "#14B8A6",
     "sort_order": 7
   },
   {
@@ -76,7 +83,8 @@
     "description_en": "Planning, implementation, and control of activities to ensure consistency with a master data record.",
     "description_ar": "تخطيط وتنفيذ ومراقبة الأنشطة لضمان الاتساق مع سجل البيانات الرئيسية.",
     "question_count": 3,
-    "is_oe_domain": false,
+    "icon": "Link",
+    "color": "#F97316",
     "sort_order": 8
   },
   {
@@ -86,7 +94,8 @@
     "description_en": "Planning, implementation, and control of activities that enable getting value from data through analysis.",
     "description_ar": "تخطيط وتنفيذ ومراقبة الأنشطة التي تمكن من الحصول على قيمة من البيانات من خلال التحليل.",
     "question_count": 4,
-    "is_oe_domain": false,
+    "icon": "BarChart3",
+    "color": "#0EA5E9",
     "sort_order": 9
   },
   {
@@ -96,7 +105,8 @@
     "description_en": "Managing and measuring the value derived from data assets.",
     "description_ar": "إدارة وقياس القيمة المستمدة من أصول البيانات.",
     "question_count": 2,
-    "is_oe_domain": false,
+    "icon": "TrendingUp",
+    "color": "#22C55E",
     "sort_order": 10
   },
   {
@@ -106,7 +116,8 @@
     "description_en": "Making data freely available for use and republishing without restrictions.",
     "description_ar": "إتاحة البيانات مجاناً للاستخدام وإعادة النشر دون قيود.",
     "question_count": 3,
-    "is_oe_domain": false,
+    "icon": "Globe",
+    "color": "#A855F7",
     "sort_order": 11
   },
   {
@@ -116,7 +127,8 @@
     "description_en": "Managing access to information held by public bodies.",
     "description_ar": "إدارة الوصول إلى المعلومات التي تحتفظ بها الجهات العامة.",
     "question_count": 2,
-    "is_oe_domain": false,
+    "icon": "Unlock",
+    "color": "#EF4444",
     "sort_order": 12
   },
   {
@@ -126,7 +138,8 @@
     "description_en": "Categorizing data based on its sensitivity and the impact to the organization.",
     "description_ar": "تصنيف البيانات بناءً على حساسيتها وتأثيرها على المنظمة.",
     "question_count": 3,
-    "is_oe_domain": false,
+    "icon": "Tags",
+    "color": "#84CC16",
     "sort_order": 13
   },
   {
@@ -136,7 +149,8 @@
     "description_en": "Protecting personal data and ensuring privacy rights.",
     "description_ar": "حماية البيانات الشخصية وضمان حقوق الخصوصية.",
     "question_count": 2,
-    "is_oe_domain": false,
+    "icon": "Lock",
+    "color": "#DC2626",
     "sort_order": 14
   }
 ]

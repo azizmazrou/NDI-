@@ -1,20 +1,20 @@
-"""Organization model."""
+"""Organization model - Legacy, kept for migration compatibility."""
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, List
 
 from sqlalchemy import String, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
-if TYPE_CHECKING:
-    from app.models.assessment import Assessment
-
 
 class Organization(Base):
-    """Organization / الجهة model."""
+    """Organization / الجهة model - Legacy table kept for migration compatibility.
+
+    Note: The system now uses single organization settings (OrganizationSettings in settings.py).
+    This model is kept to prevent migration errors with existing databases.
+    """
 
     __tablename__ = "organizations"
 
@@ -33,11 +33,6 @@ class Organization(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
-
-    # Relationships
-    assessments: Mapped[List["Assessment"]] = relationship(
-        "Assessment", back_populates="organization", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

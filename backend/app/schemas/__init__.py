@@ -1,10 +1,4 @@
 """Pydantic schemas."""
-from app.schemas.organization import (
-    OrganizationCreate,
-    OrganizationUpdate,
-    OrganizationResponse,
-    OrganizationList,
-)
 from app.schemas.ndi import (
     NDIDomainResponse,
     NDIQuestionResponse,
@@ -38,13 +32,23 @@ from app.schemas.ai import (
     ChatRequest,
     ChatResponse,
 )
+from app.schemas.task import (
+    TaskCreate,
+    TaskUpdate,
+    TaskStatusUpdate,
+    TaskResponse,
+    TaskList,
+    TaskStats,
+)
+from app.schemas.score import (
+    MaturityScoreResult,
+    ComplianceScoreResult,
+    CombinedAssessmentResult,
+    DomainScore,
+    DashboardStats,
+)
 
 __all__ = [
-    # Organization
-    "OrganizationCreate",
-    "OrganizationUpdate",
-    "OrganizationResponse",
-    "OrganizationList",
     # NDI
     "NDIDomainResponse",
     "NDIQuestionResponse",
@@ -74,4 +78,17 @@ __all__ = [
     "RecommendationResponse",
     "ChatRequest",
     "ChatResponse",
+    # Tasks
+    "TaskCreate",
+    "TaskUpdate",
+    "TaskStatusUpdate",
+    "TaskResponse",
+    "TaskList",
+    "TaskStats",
+    # Scores
+    "MaturityScoreResult",
+    "ComplianceScoreResult",
+    "CombinedAssessmentResult",
+    "DomainScore",
+    "DashboardStats",
 ]

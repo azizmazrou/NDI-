@@ -16,7 +16,6 @@ from app.schemas.assessment import (
     AssessmentReport,
     DomainScore,
 )
-from app.schemas.organization import OrganizationResponse
 from app.schemas.ndi import NDIDomainResponse, NDIQuestionWithLevels, NDIMaturityLevelResponse
 
 
@@ -122,11 +121,9 @@ class AssessmentService:
 
     async def generate_report(self, assessment_id: UUID) -> AssessmentReport:
         """Generate full assessment report."""
-        # Get assessment with organization
+        # Get assessment
         result = await self.db.execute(
-            select(Assessment)
-            .options(selectinload(Assessment.organization))
-            .where(Assessment.id == assessment_id)
+            select(Assessment).where(Assessment.id == assessment_id)
         )
         assessment = result.scalar_one_or_none()
 
@@ -201,20 +198,18 @@ class AssessmentService:
         return AssessmentReport(
             assessment=AssessmentResponse(
                 id=assessment.id,
-                organization_id=assessment.organization_id,
                 assessment_type=assessment.assessment_type,
                 status=assessment.status,
                 name=assessment.name,
                 description=assessment.description,
                 target_level=assessment.target_level,
                 current_score=overall_score,
+                maturity_score=assessment.maturity_score,
+                compliance_score=assessment.compliance_score,
                 created_by=assessment.created_by,
                 created_at=assessment.created_at,
                 updated_at=assessment.updated_at,
                 completed_at=assessment.completed_at,
-                organization=OrganizationResponse.model_validate(assessment.organization)
-                if assessment.organization
-                else None,
                 responses_count=resp_count,
                 progress_percentage=(resp_count / total_questions) * 100
                 if total_questions > 0

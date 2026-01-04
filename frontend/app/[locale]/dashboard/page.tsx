@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import Link from "next/link";
 import {
@@ -14,44 +15,53 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { PageLoading } from "@/components/ui/loading";
+import { ErrorState } from "@/components/ui/error-state";
+import { useApi } from "@/lib/hooks/use-api";
+import { assessmentsApi, organizationsApi } from "@/lib/api";
+import { getLevelColor } from "@/lib/utils";
 
 export default function DashboardPage() {
   const t = useTranslations();
   const locale = useLocale();
   const Arrow = locale === "ar" ? ArrowLeft : ArrowRight;
 
-  // Mock data - replace with actual API calls
-  const stats = {
-    totalAssessments: 12,
-    completedAssessments: 8,
-    inProgressAssessments: 4,
-    averageScore: 3.2,
-    organizationsCount: 5,
-  };
+  // Fetch assessments
+  const fetchAssessments = useCallback(
+    () => assessmentsApi.list({ page_size: 5 }),
+    []
+  );
+  const {
+    data: assessmentsData,
+    loading: loadingAssessments,
+    error: assessmentsError,
+    refetch: refetchAssessments,
+  } = useApi(fetchAssessments, []);
 
-  const recentAssessments = [
-    {
-      id: "1",
-      name: locale === "ar" ? "تقييم وزارة المالية" : "Ministry of Finance Assessment",
-      status: "in_progress",
-      progress: 65,
-      score: null,
-    },
-    {
-      id: "2",
-      name: locale === "ar" ? "تقييم وزارة الصحة" : "Ministry of Health Assessment",
-      status: "completed",
-      progress: 100,
-      score: 3.5,
-    },
-    {
-      id: "3",
-      name: locale === "ar" ? "تقييم وزارة التعليم" : "Ministry of Education Assessment",
-      status: "draft",
-      progress: 20,
-      score: null,
-    },
-  ];
+  // Fetch organizations count
+  const fetchOrgs = useCallback(() => organizationsApi.list({ page_size: 1 }), []);
+  const { data: orgsData, loading: loadingOrgs } = useApi(fetchOrgs, []);
+
+  if (loadingAssessments || loadingOrgs) {
+    return <PageLoading text={locale === "ar" ? "جاري التحميل..." : "Loading..."} />;
+  }
+
+  if (assessmentsError) {
+    return <ErrorState message={assessmentsError} onRetry={refetchAssessments} />;
+  }
+
+  const assessments = assessmentsData?.items || [];
+  const totalAssessments = assessmentsData?.total || 0;
+  const completedAssessments = assessments.filter((a: any) => a.status === "completed").length;
+  const inProgressAssessments = assessments.filter((a: any) => a.status === "in_progress").length;
+
+  // Calculate average score from completed assessments
+  const completedWithScore = assessments.filter((a: any) => a.status === "completed" && a.current_score);
+  const averageScore = completedWithScore.length > 0
+    ? completedWithScore.reduce((sum: number, a: any) => sum + (a.current_score || 0), 0) / completedWithScore.length
+    : 0;
+
+  const organizationsCount = orgsData?.total || 0;
 
   return (
     <div className="space-y-6">
@@ -75,9 +85,9 @@ export default function DashboardPage() {
             <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalAssessments}</div>
+            <div className="text-2xl font-bold">{totalAssessments}</div>
             <p className="text-xs text-muted-foreground">
-              {stats.completedAssessments} {t("dashboard.completedAssessments")}
+              {completedAssessments} {t("dashboard.completedAssessments")}
             </p>
           </CardContent>
         </Card>
@@ -90,8 +100,11 @@ export default function DashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.inProgressAssessments}</div>
-            <Progress value={65} className="mt-2" />
+            <div className="text-2xl font-bold">{inProgressAssessments}</div>
+            <Progress
+              value={totalAssessments > 0 ? (inProgressAssessments / totalAssessments) * 100 : 0}
+              className="mt-2"
+            />
           </CardContent>
         </Card>
 
@@ -103,9 +116,9 @@ export default function DashboardPage() {
             <FileBarChart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.averageScore.toFixed(1)}</div>
+            <div className="text-2xl font-bold">{averageScore.toFixed(1)}</div>
             <p className="text-xs text-muted-foreground">
-              {t("levels.3")} {/* Activated */}
+              {t(`levels.${Math.floor(averageScore)}`)}
             </p>
           </CardContent>
         </Card>
@@ -118,7 +131,7 @@ export default function DashboardPage() {
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.organizationsCount}</div>
+            <div className="text-2xl font-bold">{organizationsCount}</div>
           </CardContent>
         </Card>
       </div>
@@ -143,37 +156,46 @@ export default function DashboardPage() {
             </Link>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentAssessments.map((assessment) => (
-                <div
-                  key={assessment.id}
-                  className="flex items-center justify-between p-3 rounded-lg border"
-                >
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{assessment.name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          assessment.status === "completed"
-                            ? "bg-green-100 text-green-700"
-                            : assessment.status === "in_progress"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-gray-100 text-gray-700"
-                        }`}
-                      >
-                        {t(`status.${assessment.status}`)}
-                      </span>
-                      {assessment.score && (
-                        <span className="text-xs text-muted-foreground">
-                          {t("assessment.score")}: {assessment.score}
-                        </span>
-                      )}
+            {assessments.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                {locale === "ar" ? "لا توجد تقييمات" : "No assessments yet"}
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {assessments.slice(0, 5).map((assessment: any) => (
+                  <Link
+                    key={assessment.id}
+                    href={`/${locale}/dashboard/assessments/${assessment.id}`}
+                    className="block"
+                  >
+                    <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{assessment.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              assessment.status === "completed"
+                                ? "bg-green-100 text-green-700"
+                                : assessment.status === "in_progress"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {t(`status.${assessment.status}`)}
+                          </span>
+                          {assessment.current_score && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${getLevelColor(Math.floor(assessment.current_score))}`}>
+                              {t("assessment.score")}: {assessment.current_score.toFixed(1)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Progress value={assessment.progress_percentage || 0} className="w-20" />
                     </div>
-                  </div>
-                  <Progress value={assessment.progress} className="w-20" />
-                </div>
-              ))}
-            </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

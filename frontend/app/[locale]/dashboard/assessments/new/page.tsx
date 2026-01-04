@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ArrowLeft, Building2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, ArrowLeft, Building2, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageLoading } from "@/components/ui/loading";
+import { ErrorState } from "@/components/ui/error-state";
+import { useApi, useMutation } from "@/lib/hooks/use-api";
+import { organizationsApi, assessmentsApi } from "@/lib/api";
 import { MATURITY_LEVELS } from "@/lib/constants";
 
 export default function NewAssessmentPage() {
@@ -24,28 +29,51 @@ export default function NewAssessmentPage() {
   const Arrow = locale === "ar" ? ArrowLeft : ArrowRight;
 
   const [formData, setFormData] = useState({
-    organizationId: "",
-    assessmentType: "maturity",
+    organization_id: "",
+    assessment_type: "maturity",
     name: "",
-    targetLevel: "3",
+    description: "",
+    target_level: 3,
   });
 
-  // Mock organizations - replace with API call
-  const organizations = [
-    { id: "1", name_ar: "وزارة المالية", name_en: "Ministry of Finance" },
-    { id: "2", name_ar: "وزارة الصحة", name_en: "Ministry of Health" },
-    { id: "3", name_ar: "وزارة التعليم", name_en: "Ministry of Education" },
-  ];
+  // Fetch organizations
+  const fetchOrganizations = useCallback(() => organizationsApi.list({ page_size: 100 }), []);
+  const { data: orgsData, loading: loadingOrgs, error: orgsError, refetch } = useApi(fetchOrganizations, []);
+
+  // Create mutation
+  const createMutation = useMutation((data: typeof formData) => assessmentsApi.create(data));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Call API to create assessment
-    console.log("Creating assessment:", formData);
-    router.push(`/${locale}/assessments/1`); // Redirect to assessment detail
+    try {
+      const result = await createMutation.mutate(formData);
+      router.push(`/${locale}/dashboard/assessments/${result.id}`);
+    } catch (err) {
+      console.error("Failed to create assessment:", err);
+    }
   };
+
+  if (loadingOrgs) {
+    return <PageLoading text={locale === "ar" ? "جاري التحميل..." : "Loading..."} />;
+  }
+
+  if (orgsError) {
+    return <ErrorState message={orgsError} onRetry={refetch} />;
+  }
+
+  const organizations = orgsData?.items || [];
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Link href={`/${locale}/dashboard/assessments`} className="hover:text-foreground">
+          {t("assessment.assessments")}
+        </Link>
+        <span>/</span>
+        <span>{t("assessment.newAssessment")}</span>
+      </div>
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
           {t("assessment.newAssessment")}
@@ -71,35 +99,51 @@ export default function NewAssessmentPage() {
             {/* Organization */}
             <div className="space-y-2">
               <Label htmlFor="organization">{t("organization.title")}</Label>
-              <Select
-                value={formData.organizationId}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, organizationId: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t("assessment.selectOrganization")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {organizations.map((org) => (
-                    <SelectItem key={org.id} value={org.id}>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4" />
-                        {locale === "ar" ? org.name_ar : org.name_en}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {organizations.length === 0 ? (
+                <div className="p-4 border rounded-lg text-center">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {locale === "ar"
+                      ? "لا توجد جهات مسجلة. قم بإضافة جهة أولاً."
+                      : "No organizations found. Add one first."}
+                  </p>
+                  <Link href={`/${locale}/dashboard/organizations/new`}>
+                    <Button variant="outline" size="sm">
+                      <Building2 className="h-4 w-4 me-2" />
+                      {locale === "ar" ? "إضافة جهة" : "Add Organization"}
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <Select
+                  value={formData.organization_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, organization_id: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("assessment.selectOrganization")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {organizations.map((org: any) => (
+                      <SelectItem key={org.id} value={org.id}>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4" />
+                          {locale === "ar" ? org.name_ar : org.name_en}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {/* Assessment Type */}
             <div className="space-y-2">
               <Label htmlFor="type">{t("assessment.selectType")}</Label>
               <Select
-                value={formData.assessmentType}
+                value={formData.assessment_type}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, assessmentType: value })
+                  setFormData({ ...formData, assessment_type: value })
                 }
               >
                 <SelectTrigger>
@@ -121,7 +165,7 @@ export default function NewAssessmentPage() {
 
             {/* Assessment Name */}
             <div className="space-y-2">
-              <Label htmlFor="name">{t("common.name")}</Label>
+              <Label htmlFor="name">{t("common.name")} *</Label>
               <Input
                 id="name"
                 value={formData.name}
@@ -133,6 +177,25 @@ export default function NewAssessmentPage() {
                     ? "مثال: تقييم Q4 2024"
                     : "e.g., Q4 2024 Assessment"
                 }
+                required
+              />
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="description">{locale === "ar" ? "الوصف" : "Description"}</Label>
+              <textarea
+                id="description"
+                className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                placeholder={
+                  locale === "ar"
+                    ? "وصف موجز للتقييم..."
+                    : "Brief description of the assessment..."
+                }
               />
             </div>
 
@@ -140,9 +203,9 @@ export default function NewAssessmentPage() {
             <div className="space-y-2">
               <Label htmlFor="targetLevel">{t("assessment.targetLevel")}</Label>
               <Select
-                value={formData.targetLevel}
+                value={String(formData.target_level)}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, targetLevel: value })
+                  setFormData({ ...formData, target_level: parseInt(value) })
                 }
               >
                 <SelectTrigger>
@@ -157,6 +220,13 @@ export default function NewAssessmentPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Error */}
+            {createMutation.error && (
+              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                {createMutation.error}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -168,7 +238,13 @@ export default function NewAssessmentPage() {
           >
             {t("common.cancel")}
           </Button>
-          <Button type="submit" disabled={!formData.organizationId}>
+          <Button
+            type="submit"
+            disabled={createMutation.loading || !formData.organization_id || !formData.name}
+          >
+            {createMutation.loading ? (
+              <Loader2 className="h-4 w-4 animate-spin me-2" />
+            ) : null}
             {t("common.create")}
             <Arrow className="ms-2 h-4 w-4" />
           </Button>

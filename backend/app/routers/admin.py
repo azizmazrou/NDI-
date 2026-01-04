@@ -413,3 +413,64 @@ async def reset_assessments(db: AsyncSession = Depends(get_db)):
             status_code=500,
             detail=f"Failed to reset assessments: {str(e)}"
         )
+
+
+@router.get("/debug-evidence")
+async def debug_evidence(
+    limit: int = Query(10, description="Number of samples to return"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Debug endpoint to check acceptance evidence data.
+    Shows sample data to verify text_en, text_ar, and specification_code.
+    """
+    try:
+        # Sample acceptance evidence with specification codes
+        result = await db.execute(text("""
+            SELECT ae.id, ae.evidence_id, ae.text_en, ae.text_ar,
+                   ae.specification_code, ae.inherits_from_level,
+                   ml.level as maturity_level,
+                   q.code as question_code
+            FROM ndi_acceptance_evidence ae
+            JOIN ndi_maturity_levels ml ON ae.maturity_level_id = ml.id
+            JOIN ndi_questions q ON ml.question_id = q.id
+            ORDER BY q.code, ml.level, ae.evidence_id
+            LIMIT :limit
+        """), {"limit": limit})
+        rows = result.fetchall()
+
+        samples = []
+        for row in rows:
+            samples.append({
+                "id": str(row[0]),
+                "evidence_id": row[1],
+                "text_en": row[2],
+                "text_ar": row[3],
+                "specification_code": row[4],
+                "inherits_from_level": row[5],
+                "maturity_level": row[6],
+                "question_code": row[7],
+            })
+
+        # Count stats
+        stats_result = await db.execute(text("""
+            SELECT
+                COUNT(*) as total,
+                COUNT(CASE WHEN text_en IS NOT NULL AND text_en != '' THEN 1 END) as with_text_en,
+                COUNT(CASE WHEN text_ar IS NOT NULL AND text_ar != '' THEN 1 END) as with_text_ar,
+                COUNT(CASE WHEN specification_code IS NOT NULL THEN 1 END) as with_spec_code
+            FROM ndi_acceptance_evidence
+        """))
+        stats = stats_result.fetchone()
+
+        return {
+            "stats": {
+                "total_evidence": stats[0],
+                "with_text_en": stats[1],
+                "with_text_ar": stats[2],
+                "with_specification_code": stats[3],
+            },
+            "samples": samples,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

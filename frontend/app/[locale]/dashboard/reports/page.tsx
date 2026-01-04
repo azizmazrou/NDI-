@@ -128,19 +128,31 @@ export default function ReportsPage() {
           <CardTitle>{t("report.selectAssessment")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <Select value={selectedAssessmentId} onValueChange={setSelectedAssessmentId}>
-            <SelectTrigger className="w-full max-w-md">
-              <SelectValue placeholder={t("report.selectAssessment")} />
-            </SelectTrigger>
-            <SelectContent>
-              {assessments.map((assessment) => (
-                <SelectItem key={assessment.id} value={assessment.id}>
-                  {assessment.name || t(`assessment.${assessment.assessment_type}Assessment`)} -{" "}
-                  {new Date(assessment.created_at).toLocaleDateString(locale)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {loading ? (
+            <p className="text-muted-foreground">{t("common.loading")}</p>
+          ) : assessments.length === 0 ? (
+            <div className="text-center py-4">
+              <p className="text-muted-foreground">
+                {locale === "ar"
+                  ? "لا توجد تقييمات متاحة. قم بإنشاء تقييم أولاً."
+                  : "No assessments available. Create an assessment first."}
+              </p>
+            </div>
+          ) : (
+            <Select value={selectedAssessmentId} onValueChange={setSelectedAssessmentId}>
+              <SelectTrigger className="w-full max-w-md">
+                <SelectValue placeholder={t("report.selectAssessment")} />
+              </SelectTrigger>
+              <SelectContent>
+                {assessments.map((assessment) => (
+                  <SelectItem key={assessment.id} value={assessment.id}>
+                    {assessment.name || t(`assessment.${assessment.assessment_type}Assessment`)} -{" "}
+                    {new Date(assessment.created_at).toLocaleDateString(locale)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </CardContent>
       </Card>
 

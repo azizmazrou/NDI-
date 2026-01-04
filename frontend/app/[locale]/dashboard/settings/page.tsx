@@ -31,19 +31,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { settingsApi } from "@/lib/api";
+import { settingsApi, type AIProvider } from "@/lib/api";
 import type { OrganizationSettings } from "@/types/ndi";
-
-interface AIProvider {
-  id: string;
-  name_en: string;
-  name_ar: string;
-  api_endpoint: string | null;
-  model_name: string | null;
-  is_enabled: boolean;
-  is_default: boolean;
-  has_api_key: boolean;
-}
 
 const DEFAULT_MODELS: Record<string, string[]> = {
   openai: ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
@@ -90,7 +79,7 @@ export default function SettingsPage() {
     try {
       const [orgData, providersResponse] = await Promise.all([
         settingsApi.get().catch(() => null),
-        fetch("/api/v1/settings/ai-providers").then(r => r.json()).catch(() => ({ providers: [] })),
+        settingsApi.getAIProviders().catch(() => ({ providers: [] })),
       ]);
 
       if (orgData) {
@@ -152,16 +141,9 @@ export default function SettingsPage() {
         updateData.model_name = models[providerId];
       }
 
-      const response = await fetch(`/api/v1/settings/ai-providers/${providerId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updateData),
-      });
-
-      if (response.ok) {
-        await fetchData();
-        setApiKeys(prev => ({ ...prev, [providerId]: "" }));
-      }
+      await settingsApi.updateAIProvider(providerId, updateData);
+      await fetchData();
+      setApiKeys(prev => ({ ...prev, [providerId]: "" }));
     } catch (error) {
       console.error("Failed to save:", error);
     } finally {
@@ -174,16 +156,7 @@ export default function SettingsPage() {
     setTestResults(prev => ({ ...prev, [providerId]: { success: false, message: "Testing..." } }));
 
     try {
-      const response = await fetch(`/api/v1/settings/ai-providers/${providerId}/test`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider_id: providerId,
-          api_key: apiKeys[providerId] || null,
-        }),
-      });
-
-      const result = await response.json();
+      const result = await settingsApi.testAIProvider(providerId, apiKeys[providerId] || undefined);
       setTestResults(prev => ({
         ...prev,
         [providerId]: { success: result.success, message: result.message }
@@ -200,11 +173,7 @@ export default function SettingsPage() {
 
   const handleSetDefault = async (providerId: string) => {
     try {
-      await fetch(`/api/v1/settings/ai-providers/${providerId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_default: true, is_enabled: true }),
-      });
+      await settingsApi.updateAIProvider(providerId, { is_default: true, is_enabled: true });
       await fetchData();
     } catch (error) {
       console.error("Failed to set default:", error);
@@ -213,11 +182,7 @@ export default function SettingsPage() {
 
   const handleToggleEnabled = async (providerId: string, enabled: boolean) => {
     try {
-      await fetch(`/api/v1/settings/ai-providers/${providerId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_enabled: enabled }),
-      });
+      await settingsApi.updateAIProvider(providerId, { is_enabled: enabled });
       await fetchData();
     } catch (error) {
       console.error("Failed to toggle:", error);

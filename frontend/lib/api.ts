@@ -79,6 +79,18 @@ async function fetchApi<T>(endpoint: string, options: RequestOptions = {}): Prom
   return response.json();
 }
 
+// AI Provider types
+export interface AIProvider {
+  id: string;
+  name_en: string;
+  name_ar: string;
+  api_endpoint: string | null;
+  model_name: string | null;
+  is_enabled: boolean;
+  is_default: boolean;
+  has_api_key: boolean;
+}
+
 // Organization Settings (single organization)
 export const settingsApi = {
   get: () => fetchApi<OrganizationSettings>("/settings/organization"),
@@ -88,6 +100,31 @@ export const settingsApi = {
       method: "PUT",
       body: JSON.stringify(data),
     }),
+
+  // AI Providers
+  getAIProviders: () =>
+    fetchApi<{ providers: AIProvider[] }>("/settings/ai-providers"),
+
+  updateAIProvider: (providerId: string, data: {
+    api_key?: string;
+    api_endpoint?: string;
+    model_name?: string;
+    is_enabled?: boolean;
+    is_default?: boolean;
+  }) =>
+    fetchApi<AIProvider>(`/settings/ai-providers/${providerId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  testAIProvider: (providerId: string, apiKey?: string) =>
+    fetchApi<{ success: boolean; message: string; provider_id: string }>(
+      `/settings/ai-providers/${providerId}/test`,
+      {
+        method: "POST",
+        body: JSON.stringify({ provider_id: providerId, api_key: apiKey }),
+      }
+    ),
 };
 
 // NDI Data

@@ -8,17 +8,35 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models.ndi import NDIDomain, NDIQuestion, NDIMaturityLevel, NDISpecification
+from app.models.ndi import NDIDomain, NDIQuestion, NDIMaturityLevel, NDISpecification, NDIAcceptanceEvidence
 from app.schemas.ndi import (
     NDIDomainResponse,
     NDIDomainList,
     NDIQuestionResponse,
     NDIQuestionWithLevels,
     NDIMaturityLevelResponse,
+    NDIAcceptanceEvidenceResponse,
     NDISpecificationResponse,
     NDISpecificationList,
     NDIDomainWithQuestions,
 )
+
+
+def maturity_level_to_response(ml: NDIMaturityLevel) -> NDIMaturityLevelResponse:
+    """Convert maturity level model to response with acceptance evidence."""
+    return NDIMaturityLevelResponse(
+        id=ml.id,
+        question_id=ml.question_id,
+        level=ml.level,
+        name_en=ml.name_en,
+        name_ar=ml.name_ar,
+        description_en=ml.description_en,
+        description_ar=ml.description_ar,
+        acceptance_evidence=[
+            NDIAcceptanceEvidenceResponse.model_validate(ev)
+            for ev in sorted(ml.acceptance_evidence, key=lambda x: x.sort_order)
+        ] if ml.acceptance_evidence else None,
+    )
 
 router = APIRouter()
 
@@ -48,7 +66,9 @@ async def get_domain(
     result = await db.execute(
         select(NDIDomain)
         .options(
-            selectinload(NDIDomain.questions).selectinload(NDIQuestion.maturity_levels),
+            selectinload(NDIDomain.questions)
+            .selectinload(NDIQuestion.maturity_levels)
+            .selectinload(NDIMaturityLevel.acceptance_evidence),
             selectinload(NDIDomain.specifications),
         )
         .where(NDIDomain.code == code.upper())
@@ -68,6 +88,7 @@ async def get_domain(
         question_count=domain.question_count,
         icon=domain.icon,
         color=domain.color,
+        is_oe_domain=domain.is_oe_domain,
         sort_order=domain.sort_order,
         questions=[
             NDIQuestionWithLevels(
@@ -78,7 +99,7 @@ async def get_domain(
                 question_ar=q.question_ar,
                 sort_order=q.sort_order,
                 maturity_levels=[
-                    NDIMaturityLevelResponse.model_validate(ml)
+                    maturity_level_to_response(ml)
                     for ml in sorted(q.maturity_levels, key=lambda x: x.level)
                 ],
             )
@@ -106,10 +127,13 @@ async def get_domain_questions(
     if not domain:
         raise HTTPException(status_code=404, detail="Domain not found")
 
-    # Get questions with levels
+    # Get questions with levels and acceptance evidence
     result = await db.execute(
         select(NDIQuestion)
-        .options(selectinload(NDIQuestion.maturity_levels))
+        .options(
+            selectinload(NDIQuestion.maturity_levels)
+            .selectinload(NDIMaturityLevel.acceptance_evidence)
+        )
         .where(NDIQuestion.domain_id == domain.id)
         .order_by(NDIQuestion.sort_order)
     )
@@ -124,7 +148,7 @@ async def get_domain_questions(
             question_ar=q.question_ar,
             sort_order=q.sort_order,
             maturity_levels=[
-                NDIMaturityLevelResponse.model_validate(ml)
+                maturity_level_to_response(ml)
                 for ml in sorted(q.maturity_levels, key=lambda x: x.level)
             ],
         )
@@ -141,7 +165,8 @@ async def get_question(
     result = await db.execute(
         select(NDIQuestion)
         .options(
-            selectinload(NDIQuestion.maturity_levels),
+            selectinload(NDIQuestion.maturity_levels)
+            .selectinload(NDIMaturityLevel.acceptance_evidence),
             selectinload(NDIQuestion.domain),
         )
         .where(NDIQuestion.code == code.upper())
@@ -159,7 +184,7 @@ async def get_question(
         question_ar=question.question_ar,
         sort_order=question.sort_order,
         maturity_levels=[
-            NDIMaturityLevelResponse.model_validate(ml)
+            maturity_level_to_response(ml)
             for ml in sorted(question.maturity_levels, key=lambda x: x.level)
         ],
         domain=NDIDomainResponse.model_validate(question.domain) if question.domain else None,
@@ -171,7 +196,7 @@ async def get_question_levels(
     code: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Get maturity levels for a question."""
+    """Get maturity levels for a question with acceptance evidence."""
     # Get the question first
     question_result = await db.execute(
         select(NDIQuestion).where(NDIQuestion.code == code.upper())
@@ -183,12 +208,13 @@ async def get_question_levels(
 
     result = await db.execute(
         select(NDIMaturityLevel)
+        .options(selectinload(NDIMaturityLevel.acceptance_evidence))
         .where(NDIMaturityLevel.question_id == question.id)
         .order_by(NDIMaturityLevel.level)
     )
     levels = result.scalars().all()
 
-    return [NDIMaturityLevelResponse.model_validate(ml) for ml in levels]
+    return [maturity_level_to_response(ml) for ml in levels]
 
 
 @router.get("/specifications", response_model=NDISpecificationList)

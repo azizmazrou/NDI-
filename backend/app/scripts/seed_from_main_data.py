@@ -4,11 +4,10 @@ import json
 import uuid
 from pathlib import Path
 
-from sqlalchemy import select, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session_maker, init_db
-from app.models.ndi import NDIDomain, NDIQuestion, NDIMaturityLevel, NDIAcceptanceEvidence
 
 
 # Path to main-data.json
@@ -92,25 +91,32 @@ async def clear_existing_data(session: AsyncSession) -> None:
 
 
 async def seed_domains(session: AsyncSession, domains_data: list) -> dict:
-    """Seed NDI domains."""
+    """Seed NDI domains using raw SQL to match actual DB schema."""
     domain_map = {}
 
     for idx, data in enumerate(domains_data, start=1):
         code = data["code"]
         extra = DOMAIN_DESCRIPTIONS.get(code, {})
+        domain_id = uuid.uuid4()
 
-        domain = NDIDomain(
-            id=uuid.uuid4(),
-            code=code,
-            name_en=data["name_en"],
-            name_ar=data["name_ar"],
-            description_en=extra.get("description_en", ""),
-            description_ar=extra.get("description_ar", ""),
-            question_count=data.get("question_count", 0),
-            sort_order=idx,
+        # Use raw SQL to insert only columns that exist in DB
+        await session.execute(
+            text("""
+                INSERT INTO ndi_domains (id, code, name_en, name_ar, description_en, description_ar, question_count, sort_order)
+                VALUES (:id, :code, :name_en, :name_ar, :description_en, :description_ar, :question_count, :sort_order)
+            """),
+            {
+                "id": domain_id,
+                "code": code,
+                "name_en": data["name_en"],
+                "name_ar": data["name_ar"],
+                "description_en": extra.get("description_en", ""),
+                "description_ar": extra.get("description_ar", ""),
+                "question_count": data.get("question_count", 0),
+                "sort_order": idx,
+            }
         )
-        session.add(domain)
-        domain_map[code] = domain
+        domain_map[code] = domain_id
         print(f"  Created domain: {code} - {data['name_en']}")
 
     await session.flush()
@@ -122,57 +128,72 @@ async def seed_questions_and_levels(
     questions_data: list,
     domain_map: dict
 ) -> None:
-    """Seed NDI questions and their maturity levels."""
+    """Seed NDI questions and their maturity levels using raw SQL."""
 
     for q_idx, q_data in enumerate(questions_data, start=1):
         domain_code = q_data["domain_code"]
-        domain = domain_map.get(domain_code)
+        domain_id = domain_map.get(domain_code)
 
-        if not domain:
+        if not domain_id:
             print(f"  Warning: Domain {domain_code} not found, skipping question {q_data['code']}")
             continue
 
-        # Create question
-        question = NDIQuestion(
-            id=uuid.uuid4(),
-            domain_id=domain.id,
-            code=q_data["code"],
-            question_en=q_data["question_en"],
-            question_ar=q_data["question_ar"],
-            sort_order=q_idx,
+        # Create question using raw SQL
+        question_id = uuid.uuid4()
+        await session.execute(
+            text("""
+                INSERT INTO ndi_questions (id, domain_id, code, question_en, question_ar, sort_order)
+                VALUES (:id, :domain_id, :code, :question_en, :question_ar, :sort_order)
+            """),
+            {
+                "id": question_id,
+                "domain_id": domain_id,
+                "code": q_data["code"],
+                "question_en": q_data["question_en"],
+                "question_ar": q_data["question_ar"],
+                "sort_order": q_idx,
+            }
         )
-        session.add(question)
-        await session.flush()  # To get the question ID
 
         print(f"  Created question: {q_data['code']}")
 
         # Create maturity levels for this question
         for level_data in q_data.get("levels", []):
-            maturity_level = NDIMaturityLevel(
-                id=uuid.uuid4(),
-                question_id=question.id,
-                level=level_data["level"],
-                name_en=level_data["name_en"],
-                name_ar=level_data["name_ar"],
-                description_en=level_data.get("description_en", ""),
-                description_ar=level_data.get("description_ar", ""),
+            level_id = uuid.uuid4()
+            await session.execute(
+                text("""
+                    INSERT INTO ndi_maturity_levels (id, question_id, level, name_en, name_ar, description_en, description_ar)
+                    VALUES (:id, :question_id, :level, :name_en, :name_ar, :description_en, :description_ar)
+                """),
+                {
+                    "id": level_id,
+                    "question_id": question_id,
+                    "level": level_data["level"],
+                    "name_en": level_data["name_en"],
+                    "name_ar": level_data["name_ar"],
+                    "description_en": level_data.get("description_en", ""),
+                    "description_ar": level_data.get("description_ar", ""),
+                }
             )
-            session.add(maturity_level)
-            await session.flush()
 
             # Create acceptance evidence records
             ev_counter = 1
             for ev in level_data.get("acceptance_evidence", []):
                 if not ev.get("inherits_from_level"):
-                    evidence = NDIAcceptanceEvidence(
-                        id=uuid.uuid4(),
-                        maturity_level_id=maturity_level.id,
-                        evidence_id=ev.get("id", ev_counter),
-                        text_en=ev.get("text_en", ""),
-                        text_ar=ev.get("text_ar", ""),
-                        sort_order=ev_counter,
+                    await session.execute(
+                        text("""
+                            INSERT INTO ndi_acceptance_evidence (id, maturity_level_id, evidence_id, text_en, text_ar, sort_order)
+                            VALUES (:id, :maturity_level_id, :evidence_id, :text_en, :text_ar, :sort_order)
+                        """),
+                        {
+                            "id": uuid.uuid4(),
+                            "maturity_level_id": level_id,
+                            "evidence_id": ev.get("id", ev_counter),
+                            "text_en": ev.get("text_en", ""),
+                            "text_ar": ev.get("text_ar", ""),
+                            "sort_order": ev_counter,
+                        }
                     )
-                    session.add(evidence)
                     ev_counter += 1
 
         print(f"    Created {len(q_data.get('levels', []))} maturity levels")

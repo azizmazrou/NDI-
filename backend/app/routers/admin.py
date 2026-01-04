@@ -14,7 +14,7 @@ from sqlalchemy import text
 
 from app.database import get_db
 
-router = APIRouter(prefix="/admin", tags=["Admin - الإدارة"])
+router = APIRouter(tags=["Admin - الإدارة"])
 
 
 # Domain descriptions (OE = Open Entity domains)

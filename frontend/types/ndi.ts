@@ -30,6 +30,7 @@ export interface NDIDomain {
   icon?: string;
   color?: string;
   sort_order: number;
+  questions?: NDIQuestion[];
 }
 
 export interface NDIAcceptanceEvidence {

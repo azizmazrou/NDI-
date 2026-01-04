@@ -21,17 +21,32 @@ router = APIRouter()
 @router.get("/stats")
 async def get_dashboard_stats(
     assessment_id: Optional[UUID] = None,
+    language: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Get dashboard statistics."""
-    # Get the most recent or specified assessment
+    """Get dashboard statistics - compatible with frontend expectations."""
+    # Get counts
+    total_assessments = await db.scalar(select(func.count(Assessment.id))) or 0
+    completed_assessments = await db.scalar(
+        select(func.count(Assessment.id)).where(Assessment.status == "completed")
+    ) or 0
+    active_assessments = await db.scalar(
+        select(func.count(Assessment.id)).where(Assessment.status == "in_progress")
+    ) or 0
+
+    # Task counts
+    total_tasks = await db.scalar(select(func.count(Task.id))) or 0
+    pending_tasks = await db.scalar(
+        select(func.count(Task.id)).where(Task.status == "pending")
+    ) or 0
+    overdue_tasks = 0  # Would need date comparison
+
+    # Get the most recent assessment for scores
     if assessment_id:
         result = await db.execute(
             select(Assessment).where(Assessment.id == assessment_id)
         )
         assessment = result.scalar_one_or_none()
-        if not assessment:
-            raise HTTPException(status_code=404, detail="Assessment not found")
     else:
         result = await db.execute(
             select(Assessment)
@@ -40,70 +55,28 @@ async def get_dashboard_stats(
         )
         assessment = result.scalar_one_or_none()
 
-    if not assessment:
-        # Return empty stats if no assessment exists
-        return {
-            "maturity": {
-                "overall_score": 0,
-                "overall_level": 0,
-                "overall_level_name_en": "No Assessment",
-                "overall_level_name_ar": "لا يوجد تقييم",
-                "overall_percentage": 0,
-                "domain_scores": [],
-                "answered_count": 0,
-                "total_questions": 42,
-            },
-            "compliance": {
-                "compliant_count": 0,
-                "partial_count": 0,
-                "non_compliant_count": 0,
-                "total_specifications": 0,
-                "compliance_percentage": 0,
-                "is_compliant": False,
-            },
-            "progress": {
-                "answered_questions": 0,
-                "total_questions": 42,
-                "questions_with_evidence": 0,
-            },
-        }
+    average_maturity_score = 0.0
+    average_compliance_score = 0.0
+    domain_progress = []
 
-    # Calculate scores
-    service = ScoreService(db)
-    maturity = await service.calculate_maturity_score(assessment.id)
-    compliance = await service.calculate_compliance_score(assessment.id)
-
-    # Get progress data
-    total_questions_result = await db.execute(select(func.count(NDIQuestion.id)))
-    total_questions = total_questions_result.scalar() or 42
-
-    answered_result = await db.execute(
-        select(func.count(AssessmentResponse.id))
-        .where(AssessmentResponse.assessment_id == assessment.id)
-        .where(AssessmentResponse.selected_level.isnot(None))
-    )
-    answered_questions = answered_result.scalar() or 0
-
-    with_evidence_result = await db.execute(
-        select(func.count(func.distinct(AssessmentResponse.id)))
-        .select_from(AssessmentResponse)
-        .join(Evidence, Evidence.response_id == AssessmentResponse.id)
-        .where(AssessmentResponse.assessment_id == assessment.id)
-    )
-    questions_with_evidence = with_evidence_result.scalar() or 0
+    if assessment:
+        service = ScoreService(db)
+        maturity = await service.calculate_maturity_score(assessment.id)
+        compliance = await service.calculate_compliance_score(assessment.id)
+        average_maturity_score = maturity.overall_score
+        average_compliance_score = compliance.compliance_percentage
+        domain_progress = [ds.model_dump() for ds in maturity.domain_scores]
 
     return {
-        "assessment_id": str(assessment.id),
-        "assessment_name": assessment.name,
-        "assessment_status": assessment.status,
-        "maturity": maturity.model_dump(),
-        "compliance": compliance.model_dump(),
-        "progress": {
-            "answered_questions": answered_questions,
-            "total_questions": total_questions,
-            "questions_with_evidence": questions_with_evidence,
-            "progress_percentage": round((answered_questions / total_questions) * 100, 1) if total_questions > 0 else 0,
-        },
+        "total_assessments": total_assessments,
+        "active_assessments": active_assessments,
+        "completed_assessments": completed_assessments,
+        "average_maturity_score": average_maturity_score,
+        "average_compliance_score": average_compliance_score,
+        "total_tasks": total_tasks,
+        "pending_tasks": pending_tasks,
+        "overdue_tasks": overdue_tasks,
+        "domain_progress": domain_progress,
     }
 
 

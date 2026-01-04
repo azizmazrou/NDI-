@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings as app_settings
 from app.database import init_db, close_db
-from app.routers import organizations, assessments, ndi, evidence, ai
+from app.routers import assessments, ndi, evidence, ai, tasks, scores, dashboard, reports
 from app.routers import settings as settings_router
 
 # Ensure uploads directory exists
@@ -50,9 +50,12 @@ app.add_middleware(
 app.mount("/uploads", StaticFiles(directory=app_settings.upload_dir), name="uploads")
 
 # Include routers
-app.include_router(organizations.router, prefix="/api/v1/organizations", tags=["Organizations"])
+app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["Dashboard"])
 app.include_router(ndi.router, prefix="/api/v1/ndi", tags=["NDI Data"])
 app.include_router(assessments.router, prefix="/api/v1/assessments", tags=["Assessments"])
+app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["Tasks"])
+app.include_router(scores.router, prefix="/api/v1/scores", tags=["Scores"])
+app.include_router(reports.router, prefix="/api/v1/reports", tags=["Reports"])
 app.include_router(evidence.router, prefix="/api/v1/evidence", tags=["Evidence"])
 app.include_router(ai.router, prefix="/api/v1/ai", tags=["AI"])
 app.include_router(settings_router.router, prefix="/api/v1/settings", tags=["Settings"])

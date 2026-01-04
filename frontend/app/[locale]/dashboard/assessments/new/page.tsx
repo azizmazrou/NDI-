@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ArrowLeft, Building2 } from "lucide-react";
+import { ArrowRight, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -15,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MATURITY_LEVELS } from "@/lib/constants";
+import { assessmentsApi } from "@/lib/api";
+import { MATURITY_LEVELS } from "@/types/ndi";
 
 export default function NewAssessmentPage() {
   const t = useTranslations();
@@ -24,24 +26,33 @@ export default function NewAssessmentPage() {
   const Arrow = locale === "ar" ? ArrowLeft : ArrowRight;
 
   const [formData, setFormData] = useState({
-    organizationId: "",
-    assessmentType: "maturity",
+    assessment_type: "maturity",
     name: "",
-    targetLevel: "3",
+    description: "",
+    target_level: "3",
   });
-
-  // Mock organizations - replace with API call
-  const organizations = [
-    { id: "1", name_ar: "وزارة المالية", name_en: "Ministry of Finance" },
-    { id: "2", name_ar: "وزارة الصحة", name_en: "Ministry of Health" },
-    { id: "3", name_ar: "وزارة التعليم", name_en: "Ministry of Education" },
-  ];
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Call API to create assessment
-    console.log("Creating assessment:", formData);
-    router.push(`/${locale}/assessments/1`); // Redirect to assessment detail
+    setLoading(true);
+    setError(null);
+
+    try {
+      const assessment = await assessmentsApi.create({
+        assessment_type: formData.assessment_type,
+        name: formData.name || undefined,
+        description: formData.description || undefined,
+        target_level: parseInt(formData.target_level),
+      });
+      router.push(`/${locale}/dashboard/assessments/${assessment.id}`);
+    } catch (err: any) {
+      console.error("Failed to create assessment:", err);
+      setError(err.message || (locale === "ar" ? "فشل في إنشاء التقييم" : "Failed to create assessment"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -60,46 +71,27 @@ export default function NewAssessmentPage() {
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
-            <CardTitle>{t("assessment.selectOrganization")}</CardTitle>
+            <CardTitle>{t("assessment.selectType")}</CardTitle>
             <CardDescription>
               {locale === "ar"
-                ? "اختر الجهة التي سيتم تقييمها"
-                : "Select the organization to assess"}
+                ? "حدد نوع التقييم الذي تريد إجراءه"
+                : "Select the type of assessment you want to perform"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Organization */}
-            <div className="space-y-2">
-              <Label htmlFor="organization">{t("organization.title")}</Label>
-              <Select
-                value={formData.organizationId}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, organizationId: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t("assessment.selectOrganization")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {organizations.map((org) => (
-                    <SelectItem key={org.id} value={org.id}>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4" />
-                        {locale === "ar" ? org.name_ar : org.name_en}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {error && (
+              <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm dark:bg-red-900 dark:text-red-300">
+                {error}
+              </div>
+            )}
 
             {/* Assessment Type */}
             <div className="space-y-2">
               <Label htmlFor="type">{t("assessment.selectType")}</Label>
               <Select
-                value={formData.assessmentType}
+                value={formData.assessment_type}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, assessmentType: value })
+                  setFormData({ ...formData, assessment_type: value })
                 }
               >
                 <SelectTrigger>
@@ -112,11 +104,17 @@ export default function NewAssessmentPage() {
                   <SelectItem value="compliance">
                     {t("assessment.complianceAssessment")}
                   </SelectItem>
-                  <SelectItem value="oe">
-                    {t("assessment.operationalExcellence")}
-                  </SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-sm text-muted-foreground">
+                {formData.assessment_type === "maturity"
+                  ? locale === "ar"
+                    ? "تقييم مستوى نضج إدارة البيانات في الجهة"
+                    : "Evaluate the data management maturity level"
+                  : locale === "ar"
+                  ? "تقييم مدى الامتثال للمواصفات والمعايير"
+                  : "Evaluate compliance with specifications and standards"}
+              </p>
             </div>
 
             {/* Assessment Name */}
@@ -130,9 +128,27 @@ export default function NewAssessmentPage() {
                 }
                 placeholder={
                   locale === "ar"
-                    ? "مثال: تقييم Q4 2024"
-                    : "e.g., Q4 2024 Assessment"
+                    ? "مثال: تقييم Q1 2025"
+                    : "e.g., Q1 2025 Assessment"
                 }
+              />
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="description">{t("common.description")}</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                placeholder={
+                  locale === "ar"
+                    ? "وصف اختياري للتقييم..."
+                    : "Optional description for the assessment..."
+                }
+                rows={3}
               />
             </div>
 
@@ -140,9 +156,9 @@ export default function NewAssessmentPage() {
             <div className="space-y-2">
               <Label htmlFor="targetLevel">{t("assessment.targetLevel")}</Label>
               <Select
-                value={formData.targetLevel}
+                value={formData.target_level}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, targetLevel: value })
+                  setFormData({ ...formData, target_level: value })
                 }
               >
                 <SelectTrigger>
@@ -156,6 +172,11 @@ export default function NewAssessmentPage() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-sm text-muted-foreground">
+                {locale === "ar"
+                  ? "المستوى الذي تهدف الجهة للوصول إليه"
+                  : "The level the organization aims to achieve"}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -165,12 +186,13 @@ export default function NewAssessmentPage() {
             type="button"
             variant="outline"
             onClick={() => router.back()}
+            disabled={loading}
           >
             {t("common.cancel")}
           </Button>
-          <Button type="submit" disabled={!formData.organizationId}>
-            {t("common.create")}
-            <Arrow className="ms-2 h-4 w-4" />
+          <Button type="submit" disabled={loading}>
+            {loading ? t("common.loading") : t("common.create")}
+            {!loading && <Arrow className="ms-2 h-4 w-4" />}
           </Button>
         </div>
       </form>

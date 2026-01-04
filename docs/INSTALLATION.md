@@ -86,8 +86,8 @@ After installation, access the application at:
 بعد التثبيت، يمكنك الوصول إلى التطبيق على:
 
 - **Application / التطبيق**: http://localhost (port 80)
-- **API Documentation / توثيق API**: http://localhost/docs
-- **API (ReDoc) / واجهة API**: http://localhost/redoc
+- **API Documentation / توثيق API**: http://localhost/api/docs
+- **API (ReDoc) / واجهة API**: http://localhost/api/redoc
 
 ---
 
@@ -156,6 +156,9 @@ curl http://localhost/health
 
 # Test frontend / اختبار الواجهة الأمامية
 curl -I http://localhost
+
+# Test API / اختبار API
+curl http://localhost/api/v1/ndi/domains
 ```
 
 ---
@@ -218,7 +221,7 @@ QDRANT_GRPC_PORT=6334
 # =============================================================================
 # Backend Configuration / إعدادات الخلفية
 # =============================================================================
-BACKEND_PORT=8000
+BACKEND_PORT=8833
 SECRET_KEY=generate-a-long-random-secret-key-here
 APP_ENV=production
 DEBUG=false
@@ -226,10 +229,8 @@ DEBUG=false
 # =============================================================================
 # Frontend Configuration / إعدادات الواجهة الأمامية
 # =============================================================================
-FRONTEND_PORT=3000
-NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=generate-another-long-random-secret-key
+FRONTEND_PORT=3388
+NEXT_PUBLIC_API_URL=/api/v1
 
 # =============================================================================
 # AI Configuration (Optional) / إعدادات الذكاء الاصطناعي (اختياري)
@@ -243,14 +244,6 @@ OPENAI_API_KEY=your-openai-api-key
 # Azure OpenAI
 AZURE_OPENAI_API_KEY=your-azure-key
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-
-# =============================================================================
-# Storage Configuration (Optional) / إعدادات التخزين (اختياري)
-# =============================================================================
-S3_BUCKET=ndi-evidence
-S3_ACCESS_KEY=your-access-key
-S3_SECRET_KEY=your-secret-key
-S3_ENDPOINT=https://s3.amazonaws.com
 ```
 
 ### Generate Secure Secrets / إنشاء مفاتيح آمنة
@@ -286,45 +279,36 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 
 ## 6. Post-Installation / ما بعد التثبيت
 
-### Create Admin User / إنشاء مستخدم مسؤول
+### Configure Organization Settings / إعداد معلومات الجهة
+
+The system is configured for a single organization. Update organization settings via:
+
+النظام مُعد لجهة واحدة. قم بتحديث إعدادات الجهة عبر:
+
+1. **Dashboard Settings** - Go to Settings in the dashboard
+2. **API** - Use the settings API endpoint:
 
 ```bash
-docker-compose exec backend python -c "
-from app.database import get_db_context
-from app.models.user import User
-from passlib.context import CryptContext
-import asyncio
-
-pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
-
-async def create_admin():
-    async with get_db_context() as db:
-        admin = User(
-            email='admin@example.com',
-            hashed_password=pwd_context.hash('your-secure-password'),
-            name_en='Admin',
-            name_ar='المسؤول',
-            role='admin',
-            is_active=True,
-            is_verified=True
-        )
-        db.add(admin)
-        await db.commit()
-        print('Admin user created!')
-
-asyncio.run(create_admin())
-"
-```
-
-### Create Sample Organization / إنشاء جهة نموذجية
-
-```bash
-curl -X POST http://localhost:8000/api/v1/organizations \
+curl -X PUT http://localhost/api/v1/settings/organization \
   -H "Content-Type: application/json" \
   -d '{
-    "name_en": "Ministry of Finance",
-    "name_ar": "وزارة المالية",
-    "sector": "Government"
+    "name_en": "Your Organization Name",
+    "name_ar": "اسم الجهة",
+    "sector": "Government",
+    "website": "https://example.gov.sa"
+  }'
+```
+
+### Create Your First Assessment / إنشاء أول تقييم
+
+```bash
+# Create a maturity assessment / إنشاء تقييم نضج
+curl -X POST http://localhost/api/v1/assessments \
+  -H "Content-Type: application/json" \
+  -d '{
+    "assessment_type": "maturity",
+    "name": "Q1 2025 Assessment",
+    "target_level": 3
   }'
 ```
 
@@ -332,10 +316,10 @@ curl -X POST http://localhost:8000/api/v1/organizations \
 
 ```bash
 # Check domains / فحص المجالات
-curl http://localhost:8000/api/v1/ndi/domains | jq
+curl http://localhost/api/v1/ndi/domains | jq
 
 # Check questions / فحص الأسئلة
-curl http://localhost:8000/api/v1/ndi/domains/DG/questions | jq
+curl http://localhost/api/v1/ndi/domains/DG/questions | jq
 ```
 
 ### Setup Backups / إعداد النسخ الاحتياطي
@@ -385,7 +369,7 @@ docker-compose build --no-cache
 docker-compose up -d
 
 # Run migrations / تشغيل الترحيلات
-docker-compose exec backend alembic upgrade head
+docker-compose exec app /opt/venv/bin/alembic -c /app/backend/alembic.ini upgrade head
 
 # Verify / التحقق
 make health
@@ -449,7 +433,7 @@ docker-compose down -v --rmi all --remove-orphans
 
 # Remove project directory / حذف مجلد المشروع
 cd ..
-rm -rf ndi-compliance-system
+rm -rf NDI-
 ```
 
 ---
@@ -462,7 +446,7 @@ rm -rf ndi-compliance-system
 
 ```bash
 # Check what's using the port / فحص ما يستخدم المنفذ
-sudo lsof -i :8000
+sudo lsof -i :80
 
 # Kill the process or change port in .env
 # إنهاء العملية أو تغيير المنفذ في .env
@@ -488,9 +472,19 @@ docker stats
 # زيادة حد الذاكرة في إعدادات Docker Desktop
 ```
 
+#### API Returning 404 / API يرجع 404
+
+```bash
+# Check if backend is running / تحقق من تشغيل الخلفية
+docker-compose exec app curl http://127.0.0.1:8833/health
+
+# Check nginx logs / فحص سجلات nginx
+docker-compose exec app cat /var/log/nginx/error.log
+```
+
 ### Getting Help / الحصول على المساعدة
 
-- **GitHub Issues**: [Report a bug](https://github.com/your-org/ndi-compliance-system/issues)
+- **GitHub Issues**: [Report a bug](https://github.com/azizmazrou/NDI-/issues)
 - **Documentation**: [Full docs](./README.md)
 - **Docker Guide**: [Docker docs](./DOCKER.md)
 
@@ -499,7 +493,7 @@ docker stats
 ## Next Steps / الخطوات التالية
 
 1. ✅ Installation complete / اكتمل التثبيت
-2. 📝 [Create your first organization](./USAGE.md#organizations)
-3. 📊 [Start your first assessment](./USAGE.md#assessments)
-4. 🔒 [Configure authentication](./SECURITY.md)
-5. 🚀 [Deploy to production](./DEPLOYMENT.md)
+2. 📝 Configure organization settings / إعداد معلومات الجهة
+3. 📊 Start your first assessment / بدء أول تقييم
+4. 👥 Assign tasks to users / تعيين المهام للمستخدمين
+5. 📄 Generate reports / إنشاء التقارير

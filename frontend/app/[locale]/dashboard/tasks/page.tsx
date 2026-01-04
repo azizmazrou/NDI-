@@ -1,22 +1,19 @@
 "use client";
 
-import { useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
+import { useEffect, useState } from "react";
 import {
-  Plus,
-  CheckCircle2,
-  Circle,
-  Trash2,
-  Calendar,
-  AlertCircle,
-  Clock,
   ListTodo,
+  Clock,
+  User,
+  CheckCircle2,
+  AlertCircle,
+  PlayCircle,
+  Circle,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -24,457 +21,287 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
-
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  priority: "high" | "medium" | "low";
-  status: "pending" | "in_progress" | "completed";
-  dueDate: string;
-  assessmentId?: string;
-  domainCode?: string;
-  createdAt: string;
-}
-
-const INITIAL_TASKS: Task[] = [
-  {
-    id: "1",
-    title: "Review Data Governance policies",
-    description: "Complete the review of existing data governance policies and identify gaps",
-    priority: "high",
-    status: "in_progress",
-    dueDate: "2024-12-20",
-    domainCode: "DG",
-    createdAt: "2024-12-01",
-  },
-  {
-    id: "2",
-    title: "Upload evidence for Data Quality",
-    description: "Collect and upload all evidence documents for DQ domain assessment",
-    priority: "medium",
-    status: "pending",
-    dueDate: "2024-12-25",
-    domainCode: "DQ",
-    createdAt: "2024-12-05",
-  },
-  {
-    id: "3",
-    title: "Schedule stakeholder meeting",
-    description: "Arrange meeting with IT team to discuss data architecture documentation",
-    priority: "low",
-    status: "completed",
-    dueDate: "2024-12-10",
-    domainCode: "DAM",
-    createdAt: "2024-12-02",
-  },
-];
+import { tasksApi } from "@/lib/api";
+import type { Task, TaskStatus, TaskPriority } from "@/types/ndi";
 
 export default function TasksPage() {
   const t = useTranslations();
   const locale = useLocale();
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [filter, setFilter] = useState<"all" | "pending" | "in_progress" | "completed">("all");
-  const [newTask, setNewTask] = useState({
-    title: "",
-    description: "",
-    priority: "medium" as Task["priority"],
-    dueDate: "",
-    domainCode: "",
+
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [view, setView] = useState<"my" | "assigned">("my");
+
+  useEffect(() => {
+    loadTasks();
+  }, [view]);
+
+  async function loadTasks() {
+    setLoading(true);
+    try {
+      const data = view === "my"
+        ? await tasksApi.getMyTasks()
+        : await tasksApi.getAssignedTasks();
+      setTasks(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to load tasks:", error);
+      setTasks([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updateTaskStatus(taskId: string, status: TaskStatus) {
+    try {
+      await tasksApi.updateStatus(taskId, status);
+      loadTasks();
+    } catch (error) {
+      console.error("Failed to update task:", error);
+    }
+  }
+
+  const filteredTasks = tasks.filter((task) => {
+    if (statusFilter !== "all" && task.status !== statusFilter) return false;
+    if (priorityFilter !== "all" && task.priority !== priorityFilter) return false;
+    return true;
   });
 
-  const handleAddTask = () => {
-    if (!newTask.title.trim()) return;
-
-    const task: Task = {
-      id: Date.now().toString(),
-      title: newTask.title,
-      description: newTask.description,
-      priority: newTask.priority,
-      status: "pending",
-      dueDate: newTask.dueDate,
-      domainCode: newTask.domainCode || undefined,
-      createdAt: new Date().toISOString().split("T")[0],
-    };
-
-    setTasks((prev) => [task, ...prev]);
-    setNewTask({
-      title: "",
-      description: "",
-      priority: "medium",
-      dueDate: "",
-      domainCode: "",
-    });
-    setIsDialogOpen(false);
+  const tasksByStatus = {
+    pending: filteredTasks.filter((t) => t.status === "pending"),
+    in_progress: filteredTasks.filter((t) => t.status === "in_progress"),
+    completed: filteredTasks.filter((t) => t.status === "completed"),
+    overdue: filteredTasks.filter((t) => t.status === "overdue"),
   };
 
-  const handleToggleStatus = (taskId: string) => {
-    setTasks((prev) =>
-      prev.map((task) => {
-        if (task.id === taskId) {
-          const nextStatus =
-            task.status === "pending"
-              ? "in_progress"
-              : task.status === "in_progress"
-              ? "completed"
-              : "pending";
-          return { ...task, status: nextStatus };
-        }
-        return task;
-      })
-    );
-  };
-
-  const handleDeleteTask = (taskId: string) => {
-    setTasks((prev) => prev.filter((task) => task.id !== taskId));
-  };
-
-  const filteredTasks =
-    filter === "all" ? tasks : tasks.filter((task) => task.status === filter);
-
-  const getPriorityColor = (priority: Task["priority"]) => {
-    switch (priority) {
-      case "high":
-        return "text-red-600 bg-red-100 dark:bg-red-900/30";
-      case "medium":
-        return "text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30";
-      case "low":
-        return "text-green-600 bg-green-100 dark:bg-green-900/30";
-    }
-  };
-
-  const getStatusIcon = (status: Task["status"]) => {
+  const getStatusIcon = (status: TaskStatus) => {
     switch (status) {
       case "completed":
-        return <CheckCircle2 className="h-5 w-5 text-green-600" />;
+        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
       case "in_progress":
-        return <Clock className="h-5 w-5 text-blue-600" />;
+        return <PlayCircle className="h-4 w-4 text-blue-500" />;
+      case "overdue":
+        return <AlertCircle className="h-4 w-4 text-red-500" />;
       default:
-        return <Circle className="h-5 w-5 text-muted-foreground" />;
+        return <Circle className="h-4 w-4 text-gray-400" />;
     }
   };
 
-  const stats = {
-    total: tasks.length,
-    pending: tasks.filter((t) => t.status === "pending").length,
-    inProgress: tasks.filter((t) => t.status === "in_progress").length,
-    completed: tasks.filter((t) => t.status === "completed").length,
+  const getPriorityBadge = (priority: TaskPriority) => {
+    const colors: Record<TaskPriority, string> = {
+      urgent: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+      high: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+      medium: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
+      low: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+    };
+    return (
+      <Badge variant="outline" className={colors[priority]}>
+        {t(`task.${priority}`)}
+      </Badge>
+    );
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <ListTodo className="h-6 w-6" />
-            {locale === "ar" ? "المهام" : "Tasks"}
+            {t("task.tasks")}
           </h1>
           <p className="text-muted-foreground">
             {locale === "ar"
-              ? "إدارة مهام التقييم والمتابعة"
-              : "Manage assessment tasks and follow-ups"}
+              ? "إدارة المهام المعينة لك"
+              : "Manage your assigned tasks"}
           </p>
         </div>
-
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="me-2 h-4 w-4" />
-              {locale === "ar" ? "مهمة جديدة" : "New Task"}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>
-                {locale === "ar" ? "إضافة مهمة جديدة" : "Add New Task"}
-              </DialogTitle>
-              <DialogDescription>
-                {locale === "ar"
-                  ? "أدخل تفاصيل المهمة الجديدة"
-                  : "Enter the details for the new task"}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">
-                  {locale === "ar" ? "عنوان المهمة" : "Task Title"}
-                </Label>
-                <Input
-                  id="title"
-                  value={newTask.title}
-                  onChange={(e) =>
-                    setNewTask((prev) => ({ ...prev, title: e.target.value }))
-                  }
-                  placeholder={
-                    locale === "ar" ? "أدخل عنوان المهمة..." : "Enter task title..."
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">
-                  {locale === "ar" ? "الوصف" : "Description"}
-                </Label>
-                <Textarea
-                  id="description"
-                  value={newTask.description}
-                  onChange={(e) =>
-                    setNewTask((prev) => ({ ...prev, description: e.target.value }))
-                  }
-                  placeholder={
-                    locale === "ar" ? "أدخل وصف المهمة..." : "Enter task description..."
-                  }
-                  rows={3}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>{locale === "ar" ? "الأولوية" : "Priority"}</Label>
-                  <Select
-                    value={newTask.priority}
-                    onValueChange={(value: Task["priority"]) =>
-                      setNewTask((prev) => ({ ...prev, priority: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="high">
-                        {locale === "ar" ? "عالية" : "High"}
-                      </SelectItem>
-                      <SelectItem value="medium">
-                        {locale === "ar" ? "متوسطة" : "Medium"}
-                      </SelectItem>
-                      <SelectItem value="low">
-                        {locale === "ar" ? "منخفضة" : "Low"}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dueDate">
-                    {locale === "ar" ? "تاريخ الاستحقاق" : "Due Date"}
-                  </Label>
-                  <Input
-                    id="dueDate"
-                    type="date"
-                    value={newTask.dueDate}
-                    onChange={(e) =>
-                      setNewTask((prev) => ({ ...prev, dueDate: e.target.value }))
-                    }
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>{locale === "ar" ? "المجال (اختياري)" : "Domain (Optional)"}</Label>
-                <Select
-                  value={newTask.domainCode}
-                  onValueChange={(value) =>
-                    setNewTask((prev) => ({ ...prev, domainCode: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={locale === "ar" ? "اختر المجال" : "Select domain"}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="DG">{t("domains.DG")}</SelectItem>
-                    <SelectItem value="MCM">{t("domains.MCM")}</SelectItem>
-                    <SelectItem value="DQ">{t("domains.DQ")}</SelectItem>
-                    <SelectItem value="DO">{t("domains.DO")}</SelectItem>
-                    <SelectItem value="DCM">{t("domains.DCM")}</SelectItem>
-                    <SelectItem value="DAM">{t("domains.DAM")}</SelectItem>
-                    <SelectItem value="DSI">{t("domains.DSI")}</SelectItem>
-                    <SelectItem value="RMD">{t("domains.RMD")}</SelectItem>
-                    <SelectItem value="BIA">{t("domains.BIA")}</SelectItem>
-                    <SelectItem value="DVR">{t("domains.DVR")}</SelectItem>
-                    <SelectItem value="OD">{t("domains.OD")}</SelectItem>
-                    <SelectItem value="FOI">{t("domains.FOI")}</SelectItem>
-                    <SelectItem value="DC">{t("domains.DC")}</SelectItem>
-                    <SelectItem value="PDP">{t("domains.PDP")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                {t("common.cancel")}
-              </Button>
-              <Button onClick={handleAddTask}>{t("common.save")}</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
 
-      {/* Stats */}
+      {/* View Toggle */}
+      <div className="flex flex-wrap gap-4 items-center">
+        <div className="flex rounded-lg border p-1">
+          <Button
+            variant={view === "my" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setView("my")}
+          >
+            {t("task.assignedTasks")}
+          </Button>
+          <Button
+            variant={view === "assigned" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setView("assigned")}
+          >
+            {t("task.assignedByMe")}
+          </Button>
+        </div>
+
+        {/* Filters */}
+        <div className="flex gap-2 ms-auto">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder={t("task.status")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("common.all")}</SelectItem>
+              <SelectItem value="pending">{t("task.pending")}</SelectItem>
+              <SelectItem value="in_progress">{t("task.inProgress")}</SelectItem>
+              <SelectItem value="completed">{t("task.completed")}</SelectItem>
+              <SelectItem value="overdue">{t("task.overdue")}</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder={t("task.priority")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("common.all")}</SelectItem>
+              <SelectItem value="urgent">{t("task.urgent")}</SelectItem>
+              <SelectItem value="high">{t("task.high")}</SelectItem>
+              <SelectItem value="medium">{t("task.medium")}</SelectItem>
+              <SelectItem value="low">{t("task.low")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Task Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">
-              {locale === "ar" ? "إجمالي المهام" : "Total Tasks"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-muted-foreground">
-              {stats.pending}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">{t("task.pending")}</p>
+                <p className="text-2xl font-bold">{tasksByStatus.pending.length}</p>
+              </div>
+              <Circle className="h-8 w-8 text-gray-400" />
             </div>
-            <p className="text-xs text-muted-foreground">
-              {locale === "ar" ? "قيد الانتظار" : "Pending"}
-            </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-blue-600">{stats.inProgress}</div>
-            <p className="text-xs text-muted-foreground">
-              {locale === "ar" ? "قيد التنفيذ" : "In Progress"}
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">{t("task.inProgress")}</p>
+                <p className="text-2xl font-bold">{tasksByStatus.in_progress.length}</p>
+              </div>
+              <PlayCircle className="h-8 w-8 text-blue-500" />
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
-            <p className="text-xs text-muted-foreground">
-              {locale === "ar" ? "مكتملة" : "Completed"}
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">{t("task.completed")}</p>
+                <p className="text-2xl font-bold">{tasksByStatus.completed.length}</p>
+              </div>
+              <CheckCircle2 className="h-8 w-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">{t("task.overdue")}</p>
+                <p className="text-2xl font-bold text-red-500">{tasksByStatus.overdue.length}</p>
+              </div>
+              <AlertCircle className="h-8 w-8 text-red-500" />
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-2">
-        {(["all", "pending", "in_progress", "completed"] as const).map((status) => (
-          <Button
-            key={status}
-            variant={filter === status ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFilter(status)}
-          >
-            {status === "all"
-              ? locale === "ar"
-                ? "الكل"
-                : "All"
-              : status === "pending"
-              ? locale === "ar"
-                ? "قيد الانتظار"
-                : "Pending"
-              : status === "in_progress"
-              ? locale === "ar"
-                ? "قيد التنفيذ"
-                : "In Progress"
-              : locale === "ar"
-              ? "مكتملة"
-              : "Completed"}
-          </Button>
-        ))}
-      </div>
-
-      {/* Task List */}
-      <div className="space-y-3">
-        {filteredTasks.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <ListTodo className="h-12 w-12 text-muted-foreground mb-4" />
+      {/* Tasks List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            {view === "my" ? t("task.assignedTasks") : t("task.assignedByMe")}
+          </CardTitle>
+          <CardDescription>
+            {filteredTasks.length} {locale === "ar" ? "مهمة" : "tasks"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">{t("common.loading")}</p>
+            </div>
+          ) : filteredTasks.length === 0 ? (
+            <div className="text-center py-12">
+              <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
+              <p className="text-lg font-medium">{t("task.noTasks")}</p>
               <p className="text-muted-foreground">
-                {locale === "ar" ? "لا توجد مهام" : "No tasks found"}
+                {t("task.allTasksCompleted")}
               </p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredTasks.map((task) => (
-            <Card
-              key={task.id}
-              className={cn(
-                "transition-all",
-                task.status === "completed" && "opacity-60"
-              )}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start gap-4">
-                  <button
-                    onClick={() => handleToggleStatus(task.id)}
-                    className="flex-shrink-0 mt-0.5"
-                  >
-                    {getStatusIcon(task.status)}
-                  </button>
-
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="flex items-start gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                >
+                  <div className="pt-1">{getStatusIcon(task.status)}</div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3
-                        className={cn(
-                          "font-medium",
-                          task.status === "completed" && "line-through"
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="font-medium">{task.title}</h3>
+                        {task.description && (
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                            {task.description}
+                          </p>
                         )}
-                      >
-                        {task.title}
-                      </h3>
-                      <span
-                        className={cn(
-                          "text-xs px-2 py-0.5 rounded",
-                          getPriorityColor(task.priority)
-                        )}
-                      >
-                        {task.priority === "high"
-                          ? locale === "ar"
-                            ? "عالية"
-                            : "High"
-                          : task.priority === "medium"
-                          ? locale === "ar"
-                            ? "متوسطة"
-                            : "Medium"
-                          : locale === "ar"
-                          ? "منخفضة"
-                          : "Low"}
-                      </span>
-                      {task.domainCode && (
-                        <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">
-                          {task.domainCode}
+                      </div>
+                      {getPriorityBadge(task.priority)}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-muted-foreground">
+                      {task.due_date && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          {new Date(task.due_date).toLocaleDateString(locale)}
                         </span>
                       )}
+                      {task.assignee && (
+                        <span className="flex items-center gap-1">
+                          <User className="h-4 w-4" />
+                          {task.assignee.full_name || task.assignee.email}
+                        </span>
+                      )}
+                      {task.domain_code && (
+                        <Badge variant="outline">{task.domain_code}</Badge>
+                      )}
                     </div>
-                    {task.description && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {task.description}
-                      </p>
+                  </div>
+                  <div className="flex gap-2">
+                    {task.status === "pending" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateTaskStatus(task.id, "in_progress")}
+                      >
+                        {t("task.startTask")}
+                      </Button>
                     )}
-                    {task.dueDate && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
-                        <Calendar className="h-3 w-3" />
-                        {task.dueDate}
-                      </div>
+                    {task.status === "in_progress" && (
+                      <Button
+                        size="sm"
+                        onClick={() => updateTaskStatus(task.id, "completed")}
+                      >
+                        {t("task.completeTask")}
+                      </Button>
                     )}
                   </div>
-
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="flex-shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDeleteTask(task.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,57 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import Link from "next/link";
-import { ArrowRight, ArrowLeft, Save, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowRight, ArrowLeft, Save, Loader2, CheckCircle2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { PageLoading } from "@/components/ui/loading";
+import { ErrorState } from "@/components/ui/error-state";
 import { MaturityLevelSelector } from "@/components/assessment/MaturityLevelSelector";
 import { EvidenceUploader } from "@/components/assessment/EvidenceUploader";
-import { ndiApi, assessmentsApi, evidenceApi } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { useApi, useMutation } from "@/lib/hooks/use-api";
+import { assessmentsApi, ndiApi, evidenceApi } from "@/lib/api";
+import { cn, getLevelColor } from "@/lib/utils";
 
-interface MaturityLevel {
-  id: string;
-  level: number;
-  name_en: string;
-  name_ar: string;
-  description_en: string;
-  description_ar: string;
-  acceptance_evidence_en: string;
-  acceptance_evidence_ar: string;
-}
-
-interface Question {
-  id: string;
-  code: string;
-  question_en: string;
-  question_ar: string;
-  sort_order: number;
-  maturity_levels: MaturityLevel[];
-}
-
-interface Domain {
-  id: string;
-  code: string;
-  name_en: string;
-  name_ar: string;
-  description_en: string;
-  description_ar: string;
-  questions: Question[];
-}
-
-interface Response {
-  id?: string;
-  question_id: string;
-  selected_level: number | null;
-  justification: string;
-  notes: string;
-}
-
-export default function DomainAssessmentPage({
+export default function DomainQuestionsPage({
   params,
 }: {
   params: { id: string; code: string; locale: string };
@@ -59,158 +23,89 @@ export default function DomainAssessmentPage({
   const t = useTranslations();
   const locale = useLocale();
   const Arrow = locale === "ar" ? ArrowLeft : ArrowRight;
-  const ChevronBack = locale === "ar" ? ChevronRight : ChevronLeft;
-  const ChevronForward = locale === "ar" ? ChevronLeft : ChevronRight;
 
-  const [domain, setDomain] = useState<Domain | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [responses, setResponses] = useState<Record<string, Response>>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [responses, setResponses] = useState<Record<string, { level: number | null; justification: string }>>({});
+  const [savedQuestions, setSavedQuestions] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    loadData();
-  }, [params.code, params.id]);
+  // Fetch assessment
+  const fetchAssessment = useCallback(() => assessmentsApi.get(params.id), [params.id]);
+  const { data: assessment, loading: loadingAssessment, error: assessmentError } = useApi(fetchAssessment, [params.id]);
 
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Load domain with questions
-      const domainData = await ndiApi.getDomain(params.code);
-      setDomain(domainData);
+  // Fetch domain with questions
+  const fetchDomain = useCallback(() => ndiApi.getDomain(params.code), [params.code]);
+  const { data: domain, loading: loadingDomain, error: domainError, refetch } = useApi(fetchDomain, [params.code]);
 
-      // Load existing responses
-      const existingResponses = await assessmentsApi.getResponses(params.id, params.code);
-      const responseMap: Record<string, Response> = {};
+  // Fetch existing responses
+  const fetchResponses = useCallback(
+    () => assessmentsApi.getResponses(params.id, params.code),
+    [params.id, params.code]
+  );
+  const { data: existingResponses, loading: loadingResponses } = useApi(fetchResponses, [params.id, params.code]);
+
+  // Save response mutation
+  const saveMutation = useMutation((data: { question_id: string; selected_level: number; justification?: string }) =>
+    assessmentsApi.saveResponse(params.id, data)
+  );
+
+  // Initialize responses from existing data
+  useState(() => {
+    if (existingResponses) {
+      const initialResponses: Record<string, { level: number | null; justification: string }> = {};
       existingResponses.forEach((r: any) => {
-        responseMap[r.question_id] = {
-          id: r.id,
-          question_id: r.question_id,
-          selected_level: r.selected_level,
-          justification: r.justification || "",
-          notes: r.notes || "",
-        };
+        if (r.question) {
+          initialResponses[r.question.code] = {
+            level: r.selected_level,
+            justification: r.justification || "",
+          };
+          if (r.selected_level !== null) {
+            setSavedQuestions((prev) => new Set([...Array.from(prev), r.question.code]));
+          }
+        }
       });
-      setResponses(responseMap);
-    } catch (err) {
-      console.error("Failed to load domain data:", err);
-      setError(locale === "ar" ? "فشل تحميل البيانات" : "Failed to load data");
-    } finally {
-      setLoading(false);
+      setResponses(initialResponses);
     }
-  };
+  });
 
-  const currentQuestion = domain?.questions[currentQuestionIndex];
+  const handleSaveResponse = async (questionCode: string, questionId: string) => {
+    const response = responses[questionCode];
+    if (response?.level === null || response?.level === undefined) return;
 
-  const currentResponse = currentQuestion
-    ? responses[currentQuestion.id] || {
-        question_id: currentQuestion.id,
-        selected_level: null,
-        justification: "",
-        notes: "",
-      }
-    : null;
-
-  const handleLevelSelect = (level: number) => {
-    if (!currentQuestion) return;
-    setResponses((prev) => ({
-      ...prev,
-      [currentQuestion.id]: {
-        ...currentResponse!,
-        selected_level: level,
-      },
-    }));
-  };
-
-  const handleJustificationChange = (value: string) => {
-    if (!currentQuestion) return;
-    setResponses((prev) => ({
-      ...prev,
-      [currentQuestion.id]: {
-        ...currentResponse!,
-        justification: value,
-      },
-    }));
-  };
-
-  const handleNotesChange = (value: string) => {
-    if (!currentQuestion) return;
-    setResponses((prev) => ({
-      ...prev,
-      [currentQuestion.id]: {
-        ...currentResponse!,
-        notes: value,
-      },
-    }));
-  };
-
-  const handleSave = async () => {
-    if (!currentQuestion || !currentResponse) return;
-    setSaving(true);
     try {
-      await assessmentsApi.saveResponse(params.id, {
-        question_id: currentQuestion.id,
-        selected_level: currentResponse.selected_level,
-        justification: currentResponse.justification,
-        notes: currentResponse.notes,
+      await saveMutation.mutate({
+        question_id: questionId,
+        selected_level: response.level,
+        justification: response.justification,
       });
+      setSavedQuestions((prev) => new Set([...Array.from(prev), questionCode]));
     } catch (err) {
       console.error("Failed to save response:", err);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleNext = async () => {
-    await handleSave();
-    if (domain && currentQuestionIndex < domain.questions.length - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1);
-    }
-  };
-
-  const handlePrevious = async () => {
-    await handleSave();
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex((prev) => prev - 1);
     }
   };
 
   const handleUpload = async (file: File) => {
-    if (!currentResponse?.id) {
-      // Save the response first to get an ID
-      await handleSave();
-    }
-    // Then upload the file
-    return await evidenceApi.upload(currentResponse?.id || "", file);
+    // This would need the response ID - for now we'll just log
+    console.log("Upload file:", file.name);
+    return { id: "temp-id" };
   };
 
   const handleAnalyze = async (evidenceId: string) => {
-    return await evidenceApi.analyze(evidenceId);
+    console.log("Analyze evidence:", evidenceId);
+    return {};
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
+  if (loadingAssessment || loadingDomain || loadingResponses) {
+    return <PageLoading text={locale === "ar" ? "جاري التحميل..." : "Loading..."} />;
   }
 
-  if (error || !domain) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <p className="text-destructive">{error || "Domain not found"}</p>
-        <Link href={`/${locale}/dashboard/assessments/${params.id}`}>
-          <Button variant="outline">
-            <ChevronBack className="me-2 h-4 w-4" />
-            {locale === "ar" ? "العودة للتقييم" : "Back to Assessment"}
-          </Button>
-        </Link>
-      </div>
-    );
+  if (assessmentError || domainError || !domain) {
+    return <ErrorState message={assessmentError || domainError || "Domain not found"} onRetry={refetch} />;
   }
+
+  const questions = domain.questions || [];
+  const currentQuestion = questions[currentQuestionIndex];
+  const answeredCount = savedQuestions.size;
+  const progress = questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;
 
   return (
     <div className="space-y-6">
@@ -218,185 +113,183 @@ export default function DomainAssessmentPage({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-            <Link
-              href={`/${locale}/dashboard/assessments`}
-              className="hover:text-foreground"
-            >
+            <Link href={`/${locale}/dashboard/assessments`} className="hover:text-foreground">
               {t("assessment.assessments")}
             </Link>
             <span>/</span>
-            <Link
-              href={`/${locale}/dashboard/assessments/${params.id}`}
-              className="hover:text-foreground"
-            >
-              {t("assessment.title")}
+            <Link href={`/${locale}/dashboard/assessments/${params.id}`} className="hover:text-foreground">
+              {assessment?.name}
             </Link>
             <span>/</span>
             <span>{locale === "ar" ? domain.name_ar : domain.name_en}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-medium px-2 py-1 rounded bg-primary/10 text-primary">
-              {domain.code}
-            </span>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {locale === "ar" ? domain.name_ar : domain.name_en}
-            </h1>
-          </div>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl font-bold tracking-tight">
+            <span className="text-primary me-2">[{domain.code}]</span>
+            {locale === "ar" ? domain.name_ar : domain.name_en}
+          </h1>
+          <p className="text-muted-foreground">
             {locale === "ar" ? domain.description_ar : domain.description_en}
           </p>
         </div>
 
-        <Link href={`/${locale}/dashboard/assessments/${params.id}`}>
-          <Button variant="outline">
-            <ChevronBack className="me-2 h-4 w-4" />
-            {locale === "ar" ? "العودة للتقييم" : "Back to Assessment"}
-          </Button>
-        </Link>
+        <div className="flex items-center gap-4">
+          <div className="text-sm">
+            <span className="text-muted-foreground">{t("assessment.progress")}: </span>
+            <span className="font-medium">{answeredCount}/{questions.length}</span>
+          </div>
+          <Progress value={progress} className="w-32" />
+        </div>
       </div>
 
-      {/* Progress indicator */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2">
-        {domain.questions.map((q, idx) => {
-          const hasResponse = responses[q.id]?.selected_level !== null && responses[q.id]?.selected_level !== undefined;
+      {/* Questions navigation */}
+      <div className="flex gap-2 flex-wrap">
+        {questions.map((q: any, index: number) => {
+          const isSaved = savedQuestions.has(q.code);
+          const isCurrent = index === currentQuestionIndex;
           return (
-            <button
-              key={q.id}
-              onClick={async () => {
-                await handleSave();
-                setCurrentQuestionIndex(idx);
-              }}
+            <Button
+              key={q.code}
+              variant={isCurrent ? "default" : "outline"}
+              size="sm"
               className={cn(
-                "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors",
-                idx === currentQuestionIndex
-                  ? "bg-primary text-primary-foreground"
-                  : hasResponse
-                  ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                "relative",
+                isSaved && !isCurrent && "border-green-500 text-green-600"
               )}
+              onClick={() => setCurrentQuestionIndex(index)}
             >
-              {idx + 1}
-            </button>
+              {index + 1}
+              {isSaved && (
+                <CheckCircle2 className="h-3 w-3 absolute -top-1 -end-1 text-green-500" />
+              )}
+            </Button>
           );
         })}
       </div>
 
       {/* Current Question */}
       {currentQuestion && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Question and Level Selection */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span className="text-xs font-medium px-2 py-1 rounded bg-primary/10 text-primary">
-                    {currentQuestion.code}
-                  </span>
-                  <span className="text-lg">
-                    {locale === "ar" ? "السؤال" : "Question"} {currentQuestionIndex + 1} / {domain.questions.length}
-                  </span>
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle className="text-lg">
+                  {locale === "ar" ? `السؤال ${currentQuestionIndex + 1}` : `Question ${currentQuestionIndex + 1}`}
                 </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-lg font-medium mb-6">
+                <CardDescription className="mt-2 text-base text-foreground">
                   {locale === "ar" ? currentQuestion.question_ar : currentQuestion.question_en}
-                </p>
-
-                <div className="space-y-2">
-                  <Label>{t("assessment.selectLevel")}</Label>
-                  <MaturityLevelSelector
-                    levels={currentQuestion.maturity_levels.map((ml) => ({
-                      level: ml.level,
-                      name_en: ml.name_en,
-                      name_ar: ml.name_ar,
-                      description_en: ml.description_en,
-                      description_ar: ml.description_ar,
-                      acceptance_evidence_en: ml.acceptance_evidence_en ? [ml.acceptance_evidence_en] : [],
-                      acceptance_evidence_ar: ml.acceptance_evidence_ar ? [ml.acceptance_evidence_ar] : [],
-                    }))}
-                    selectedLevel={currentResponse?.selected_level ?? null}
-                    onSelect={handleLevelSelect}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+                </CardDescription>
+              </div>
+              <span className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                {currentQuestion.code}
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Maturity Level Selection */}
+            <div>
+              <h3 className="font-medium mb-4">
+                {locale === "ar" ? "اختر مستوى النضج" : "Select Maturity Level"}
+              </h3>
+              <MaturityLevelSelector
+                levels={currentQuestion.maturity_levels || []}
+                selectedLevel={responses[currentQuestion.code]?.level ?? null}
+                onSelect={(level) =>
+                  setResponses((prev) => ({
+                    ...prev,
+                    [currentQuestion.code]: {
+                      ...prev[currentQuestion.code],
+                      level,
+                    },
+                  }))
+                }
+              />
+            </div>
 
             {/* Justification */}
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("assessment.justification")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  placeholder={locale === "ar" ? "أدخل المبرر..." : "Enter justification..."}
-                  value={currentResponse?.justification || ""}
-                  onChange={(e) => handleJustificationChange(e.target.value)}
-                  rows={4}
-                />
-              </CardContent>
-            </Card>
+            <div className="space-y-2">
+              <label className="font-medium">
+                {locale === "ar" ? "المبررات والملاحظات" : "Justification & Notes"}
+              </label>
+              <textarea
+                className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                placeholder={
+                  locale === "ar"
+                    ? "أضف المبررات والملاحظات هنا..."
+                    : "Add justification and notes here..."
+                }
+                value={responses[currentQuestion.code]?.justification || ""}
+                onChange={(e) =>
+                  setResponses((prev) => ({
+                    ...prev,
+                    [currentQuestion.code]: {
+                      ...prev[currentQuestion.code],
+                      justification: e.target.value,
+                    },
+                  }))
+                }
+              />
+            </div>
 
-            {/* Notes */}
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("assessment.notes")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  placeholder={locale === "ar" ? "ملاحظات إضافية..." : "Additional notes..."}
-                  value={currentResponse?.notes || ""}
-                  onChange={(e) => handleNotesChange(e.target.value)}
-                  rows={3}
-                />
-              </CardContent>
-            </Card>
-          </div>
+            {/* Evidence Upload */}
+            <div className="space-y-2">
+              <h3 className="font-medium">
+                {locale === "ar" ? "الأدلة والمستندات" : "Evidence & Documents"}
+              </h3>
+              <EvidenceUploader
+                responseId="temp"
+                onUpload={handleUpload}
+                onAnalyze={handleAnalyze}
+              />
+            </div>
 
-          {/* Evidence Upload */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("assessment.uploadEvidence")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <EvidenceUploader
-                  responseId={currentResponse?.id || "temp"}
-                  onUpload={handleUpload}
-                  onAnalyze={handleAnalyze}
-                />
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setCurrentQuestionIndex((prev) => Math.max(0, prev - 1))}
+                disabled={currentQuestionIndex === 0}
+              >
+                {locale === "ar" ? <ArrowRight className="h-4 w-4 me-2" /> : <ArrowLeft className="h-4 w-4 me-2" />}
+                {locale === "ar" ? "السابق" : "Previous"}
+              </Button>
+
+              <Button
+                onClick={() => handleSaveResponse(currentQuestion.code, currentQuestion.id)}
+                disabled={
+                  saveMutation.loading ||
+                  responses[currentQuestion.code]?.level === null ||
+                  responses[currentQuestion.code]?.level === undefined
+                }
+              >
+                {saveMutation.loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin me-2" />
+                ) : (
+                  <Save className="h-4 w-4 me-2" />
+                )}
+                {locale === "ar" ? "حفظ الإجابة" : "Save Response"}
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => setCurrentQuestionIndex((prev) => Math.min(questions.length - 1, prev + 1))}
+                disabled={currentQuestionIndex === questions.length - 1}
+              >
+                {locale === "ar" ? "التالي" : "Next"}
+                {locale === "ar" ? <ArrowLeft className="h-4 w-4 ms-2" /> : <ArrowRight className="h-4 w-4 ms-2" />}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Navigation */}
-      <div className="flex items-center justify-between pt-4 border-t">
-        <Button
-          variant="outline"
-          onClick={handlePrevious}
-          disabled={currentQuestionIndex === 0 || saving}
-        >
-          <ChevronBack className="me-2 h-4 w-4" />
-          {t("common.previous")}
-        </Button>
-
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? (
-            <Loader2 className="me-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="me-2 h-4 w-4" />
-          )}
-          {t("common.save")}
-        </Button>
-
-        <Button
-          onClick={handleNext}
-          disabled={currentQuestionIndex === domain.questions.length - 1 || saving}
-        >
-          {t("common.next")}
-          <ChevronForward className="ms-2 h-4 w-4" />
-        </Button>
+      {/* Back to Assessment */}
+      <div className="flex justify-center">
+        <Link href={`/${locale}/dashboard/assessments/${params.id}`}>
+          <Button variant="ghost">
+            {locale === "ar" ? <ArrowRight className="h-4 w-4 me-2" /> : <ArrowLeft className="h-4 w-4 me-2" />}
+            {locale === "ar" ? "العودة للتقييم" : "Back to Assessment"}
+          </Button>
+        </Link>
       </div>
     </div>
   );

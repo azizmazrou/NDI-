@@ -33,15 +33,15 @@
     "type": "Type",
     "language": "Language",
     "arabic": "Arabic",
-    "english": "English"
+    "english": "English",
+    "assign": "Assign",
+    "dueDate": "Due Date"
   },
   "nav": {
     "dashboard": "Dashboard",
     "assessments": "Assessments",
     "tasks": "Tasks",
-    "organizations": "Organizations",
     "reports": "Reports",
-    "chat": "AI Chat",
     "settings": "Settings",
     "domains": "NDI Domains",
     "help": "Help",
@@ -58,21 +58,31 @@
     "loginSuccess": "Login successful",
     "loginError": "Invalid email or password",
     "registerSuccess": "Registration successful",
-    "logoutSuccess": "Logged out successfully"
+    "logoutSuccess": "Logged out successfully",
+    "fullName": "Full Name",
+    "department": "Department",
+    "jobTitle": "Job Title",
+    "phone": "Phone Number"
   },
   "dashboard": {
     "title": "Dashboard",
     "welcome": "Welcome to NDI Compliance System",
-    "overview": "Overview",
+    "overview": "Overview of assessments and tasks",
     "recentAssessments": "Recent Assessments",
     "quickActions": "Quick Actions",
     "startAssessment": "Start New Assessment",
     "viewReports": "View Reports",
     "totalAssessments": "Total Assessments",
+    "activeAssessments": "Active Assessments",
     "completedAssessments": "Completed",
     "inProgressAssessments": "In Progress",
-    "averageScore": "Average Score",
-    "organizationsCount": "Organizations"
+    "averageMaturityScore": "Average Maturity Score",
+    "averageComplianceScore": "Average Compliance Score",
+    "totalTasks": "Total Tasks",
+    "pendingTasks": "Pending Tasks",
+    "overdueTasks": "Overdue Tasks",
+    "myTasks": "My Tasks",
+    "viewAllTasks": "View All Tasks"
   },
   "assessment": {
     "title": "Assessment",
@@ -80,13 +90,13 @@
     "newAssessment": "New Assessment",
     "maturityAssessment": "Maturity Assessment",
     "complianceAssessment": "Compliance Assessment",
-    "operationalExcellence": "Operational Excellence",
-    "selectOrganization": "Select Organization",
     "selectType": "Select Assessment Type",
     "targetLevel": "Target Level",
     "currentLevel": "Current Level",
     "progress": "Progress",
     "score": "Score",
+    "maturityScore": "Maturity Score",
+    "complianceScore": "Compliance Score",
     "selectLevel": "Select Maturity Level",
     "uploadEvidence": "Upload Evidence",
     "analyzeEvidence": "Analyze Evidence",
@@ -103,7 +113,37 @@
     "evidence": "Evidence",
     "noEvidence": "No evidence uploaded",
     "justification": "Justification",
-    "notes": "Notes"
+    "notes": "Notes",
+    "assignTask": "Assign Task"
+  },
+  "task": {
+    "title": "Task",
+    "tasks": "Tasks",
+    "newTask": "New Task",
+    "myTasks": "My Tasks",
+    "assignedTasks": "Tasks Assigned to Me",
+    "assignedByMe": "Tasks I Assigned",
+    "assignTo": "Assign To",
+    "assignedBy": "Assigned By",
+    "dueDate": "Due Date",
+    "priority": "Priority",
+    "urgent": "Urgent",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "status": "Status",
+    "pending": "Pending",
+    "inProgress": "In Progress",
+    "completed": "Completed",
+    "overdue": "Overdue",
+    "startTask": "Start Task",
+    "completeTask": "Complete Task",
+    "taskCompleted": "Task Completed",
+    "noTasks": "No tasks",
+    "allTasksCompleted": "All tasks completed",
+    "taskDescription": "Task Description",
+    "relatedQuestion": "Related Question",
+    "relatedDomain": "Related Domain"
   },
   "levels": {
     "0": "Absence of Capabilities",
@@ -129,15 +169,18 @@
     "DC": "Data Classification",
     "PDP": "Personal Data Protection"
   },
-  "organization": {
-    "title": "Organization",
-    "organizations": "Organizations",
-    "newOrganization": "New Organization",
+  "settings": {
+    "title": "Settings",
+    "organizationSettings": "Organization Settings",
     "nameEn": "Name (English)",
     "nameAr": "Name (Arabic)",
     "sector": "Sector",
     "website": "Website",
-    "logo": "Logo"
+    "logo": "Logo",
+    "contactEmail": "Contact Email",
+    "contactPhone": "Contact Phone",
+    "address": "Address",
+    "description": "Description"
   },
   "report": {
     "title": "Report",
@@ -147,6 +190,8 @@
     "gapAnalysis": "Gap Analysis",
     "recommendations": "Recommendations",
     "overallScore": "Overall Score",
+    "maturityScore": "Maturity Score",
+    "complianceScore": "Compliance Score",
     "domainScores": "Domain Scores",
     "exportPdf": "Export PDF",
     "exportExcel": "Export Excel",
@@ -157,7 +202,9 @@
     "low": "Low",
     "actionsRequired": "Actions Required",
     "quickWins": "Quick Wins",
-    "criticalActions": "Critical Actions"
+    "criticalActions": "Critical Actions",
+    "selectAssessment": "Select Assessment",
+    "downloadReport": "Download Report"
   },
   "evidence": {
     "title": "Evidence",
@@ -173,7 +220,10 @@
     "coveredCriteria": "Covered Criteria",
     "missingCriteria": "Missing Criteria",
     "aiRecommendations": "AI Recommendations",
-    "confidenceScore": "Confidence Score"
+    "confidenceScore": "Confidence Score",
+    "acceptanceCriteria": "Acceptance Criteria",
+    "suggestStructure": "Suggest Evidence Structure",
+    "quickCheck": "Quick Check"
   },
   "ai": {
     "title": "AI Assistant",
@@ -188,7 +238,8 @@
     "archived": "Archived",
     "pending": "Pending",
     "processing": "Processing",
-    "failed": "Failed"
+    "failed": "Failed",
+    "overdue": "Overdue"
   },
   "validation": {
     "required": "This field is required",

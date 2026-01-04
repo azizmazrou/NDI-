@@ -14,7 +14,9 @@ class NDIDomainBase(BaseModel):
     description_en: Optional[str] = None
     description_ar: Optional[str] = None
     question_count: Optional[int] = None
-    is_oe_domain: bool = False
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    is_oe_domain: bool = False  # Open Entity domain (OD, FOI)
     sort_order: int = 0
 
 
@@ -34,6 +36,20 @@ class NDIDomainList(BaseModel):
     total: int
 
 
+class NDIAcceptanceEvidenceResponse(BaseModel):
+    """Schema for acceptance evidence response."""
+
+    id: UUID
+    evidence_id: int
+    text_en: str
+    text_ar: str
+    inherits_from_level: Optional[int] = None
+    sort_order: int = 0
+
+    class Config:
+        from_attributes = True
+
+
 class NDIMaturityLevelResponse(BaseModel):
     """Schema for maturity level response."""
 
@@ -44,8 +60,7 @@ class NDIMaturityLevelResponse(BaseModel):
     name_ar: str
     description_en: str
     description_ar: str
-    acceptance_evidence_en: Optional[list[str]] = None
-    acceptance_evidence_ar: Optional[list[str]] = None
+    acceptance_evidence: Optional[list[NDIAcceptanceEvidenceResponse]] = None
     related_specifications: Optional[list[str]] = None
 
     class Config:

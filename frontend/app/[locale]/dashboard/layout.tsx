@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   ClipboardCheck,
-  Building2,
+  ListTodo,
   FileBarChart,
   Settings,
   HelpCircle,
@@ -15,8 +15,9 @@ import {
   Globe,
   Moon,
   Sun,
-  ListTodo,
-  MessageSquare,
+  Sparkles,
+  Upload,
+  BookOpen,
 } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "next-themes";
@@ -56,19 +57,24 @@ export default function DashboardLayout({
       label: t("nav.tasks"),
     },
     {
-      href: `/${locale}/dashboard/organizations`,
-      icon: <Building2 className="h-5 w-5" />,
-      label: t("nav.organizations"),
-    },
-    {
       href: `/${locale}/dashboard/reports`,
       icon: <FileBarChart className="h-5 w-5" />,
       label: t("nav.reports"),
     },
     {
+      href: `/${locale}/dashboard/evidence`,
+      icon: <Upload className="h-5 w-5" />,
+      label: locale === "ar" ? "إدارة الأدلة" : "Evidence",
+    },
+    {
       href: `/${locale}/dashboard/chat`,
-      icon: <MessageSquare className="h-5 w-5" />,
-      label: t("nav.chat"),
+      icon: <Sparkles className="h-5 w-5" />,
+      label: locale === "ar" ? "المساعد الذكي" : "AI Assistant",
+    },
+    {
+      href: `/${locale}/knowledge`,
+      icon: <BookOpen className="h-5 w-5" />,
+      label: locale === "ar" ? "قاعدة المعرفة" : "Knowledge Base",
     },
     {
       href: `/${locale}/dashboard/settings`,

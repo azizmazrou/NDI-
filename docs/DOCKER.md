@@ -59,6 +59,9 @@ cp .env.example .env
 # Start all services / بدء جميع الخدمات
 docker-compose up -d
 
+# Seed NDI data / زرع بيانات المؤشر
+docker-compose exec app /opt/venv/bin/python -m app.scripts.seed_ndi_data
+
 # View logs / عرض السجلات
 docker-compose logs -f
 
@@ -82,13 +85,13 @@ docker-compose logs -f
 ├─────────────────────────────────────────────────────────────┤
 │                        Nginx                                 │
 │                   (Reverse Proxy)                            │
-│              /api/* → Backend (8000)                         │
+│              /api/* → Backend (8833)                         │
 │              /docs, /redoc → Backend                         │
-│              /* → Frontend (3000)                            │
+│              /* → Frontend (3388)                            │
 ├───────────────────────┬─────────────────────────────────────┤
 │      Frontend         │           Backend                    │
 │     (Next.js)         │          (FastAPI)                   │
-│   127.0.0.1:3000      │       127.0.0.1:8000                 │
+│   127.0.0.1:3388      │       127.0.0.1:8833                 │
 └───────────────────────┴─────────────────────────────────────┘
               │                           │
     ┌─────────┴─────────┬────────────────┴───────────┐
@@ -101,12 +104,20 @@ docker-compose logs -f
 
 ### Services / الخدمات
 
-| Service | Port | Purpose | الخدمة | الغرض |
-|---------|------|---------|--------|-------|
-| app | 80 | Unified app (nginx + backend + frontend) | التطبيق | التطبيق الموحد |
-| postgres | 5432 | PostgreSQL with pgvector | قاعدة البيانات | PostgreSQL مع pgvector |
-| redis | 6379 | Cache and session storage | Redis | التخزين المؤقت |
-| qdrant | 6333 | Vector database for RAG | Qdrant | قاعدة المتجهات |
+| Service | Internal Port | External Port | Purpose | الخدمة | الغرض |
+|---------|---------------|---------------|---------|--------|-------|
+| app | 8833, 3388 | 80 | Unified app (nginx + backend + frontend) | التطبيق | التطبيق الموحد |
+| postgres | 5432 | 5432 | PostgreSQL with pgvector | قاعدة البيانات | PostgreSQL مع pgvector |
+| redis | 6379 | 6379 | Cache and session storage | Redis | التخزين المؤقت |
+| qdrant | 6333 | 6333 | Vector database for RAG | Qdrant | قاعدة المتجهات |
+
+### Internal Components / المكونات الداخلية
+
+| Component | Port | Description |
+|-----------|------|-------------|
+| Nginx | 80 | Reverse proxy, handles all external traffic |
+| FastAPI Backend | 8833 | REST API for assessments, tasks, scores |
+| Next.js Frontend | 3388 | Web UI with i18n support |
 
 ---
 
@@ -141,12 +152,8 @@ QDRANT_GRPC_PORT=6334
 # =============================================================================
 APP_PORT=80
 SECRET_KEY=your-secret-key-here
-
-# =============================================================================
-# Authentication / المصادقة
-# =============================================================================
-NEXTAUTH_URL=http://localhost
-NEXTAUTH_SECRET=your-nextauth-secret
+APP_ENV=production
+DEBUG=false
 
 # =============================================================================
 # AI Providers (Optional) / مزودي الذكاء الاصطناعي
@@ -282,6 +289,19 @@ APP_PORT=8080
 sudo systemctl stop nginx  # if nginx is running
 ```
 
+#### API Returning 404 / API يرجع 404
+
+```bash
+# Check if backend is running
+docker-compose exec app curl http://127.0.0.1:8833/health
+
+# Check nginx configuration
+docker-compose exec app cat /etc/nginx/nginx.conf
+
+# Check nginx error logs
+docker-compose exec app cat /var/log/nginx/error.log
+```
+
 ### Health Checks / فحوصات الصحة
 
 ```bash
@@ -289,16 +309,19 @@ sudo systemctl stop nginx  # if nginx is running
 curl http://localhost/health
 
 # Backend health
-docker-compose exec app curl http://127.0.0.1:8000/health
+docker-compose exec app curl http://127.0.0.1:8833/health
 
 # Frontend health
-docker-compose exec app curl http://127.0.0.1:3000
+docker-compose exec app curl http://127.0.0.1:3388
 
 # PostgreSQL health
 docker-compose exec postgres pg_isready -U ndi_user -d ndi_db
 
 # Redis health
 docker-compose exec redis redis-cli ping
+
+# API endpoint test
+curl http://localhost/api/v1/ndi/domains
 ```
 
 ### View Internal Logs / عرض السجلات الداخلية
@@ -308,14 +331,14 @@ docker-compose exec redis redis-cli ping
 docker-compose exec app cat /var/log/supervisor/supervisord.log
 
 # Nginx logs
-docker-compose exec app cat /var/log/supervisor/nginx.log
-docker-compose exec app cat /var/log/supervisor/nginx-error.log
+docker-compose exec app cat /var/log/nginx/access.log
+docker-compose exec app cat /var/log/nginx/error.log
 
 # Backend logs
-docker-compose exec app cat /var/log/supervisor/backend.log
+docker-compose logs app | grep backend
 
 # Frontend logs
-docker-compose exec app cat /var/log/supervisor/frontend.log
+docker-compose logs app | grep frontend
 ```
 
 ---
@@ -343,6 +366,47 @@ docker-compose up -d
 
 ---
 
+## Production Deployment / النشر للإنتاج
+
+### SSL/TLS with Let's Encrypt / شهادات SSL
+
+```bash
+# Install certbot
+sudo apt-get install certbot
+
+# Get certificate
+sudo certbot certonly --standalone -d yourdomain.com
+
+# Update nginx configuration to use SSL
+# تحديث إعدادات nginx لاستخدام SSL
+```
+
+### Resource Limits / حدود الموارد
+
+Add to `docker-compose.override.yml`:
+
+```yaml
+version: '3.8'
+services:
+  app:
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+  postgres:
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+```
+
+---
+
 ## Security Best Practices / أفضل ممارسات الأمان
 
 1. **Never commit `.env` files** - Add to `.gitignore`
@@ -350,6 +414,8 @@ docker-compose up -d
 3. **Keep images updated** - Regularly update base images
 4. **Backup regularly** - Automate database backups
 5. **Use HTTPS in production** - Configure SSL/TLS certificates
+6. **Restrict network access** - Use firewall rules
+7. **Monitor logs** - Set up log aggregation
 
 ---
 

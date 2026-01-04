@@ -1,10 +1,7 @@
 import { NextIntlClientProvider, useMessages } from "next-intl";
-import { Inter } from "next/font/google";
 import { notFound } from "next/navigation";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import "@/styles/globals.css";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 // Force dynamic rendering - prevents static generation issues during build
 export const dynamic = "force-dynamic";
@@ -37,7 +34,7 @@ export default function RootLayout({ children, params: { locale } }: RootLayoutP
       suppressHydrationWarning
     >
       <body
-        className={`${inter.variable} ${
+        className={`${
           locale === "ar" ? "font-arabic" : "font-sans"
         } antialiased`}
       >

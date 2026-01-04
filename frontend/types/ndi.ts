@@ -2,9 +2,9 @@
  * NDI Type Definitions
  */
 
-// Base types
-export interface Organization {
-  id: string;
+// Organization Settings (single organization)
+export interface OrganizationSettings {
+  id: number;
   name_en: string;
   name_ar: string;
   sector?: string;
@@ -12,6 +12,9 @@ export interface Organization {
   description_ar?: string;
   logo_url?: string;
   website?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  address?: string;
   created_at: string;
   updated_at: string;
 }
@@ -24,8 +27,18 @@ export interface NDIDomain {
   description_en?: string;
   description_ar?: string;
   question_count?: number;
-  is_oe_domain: boolean;
+  icon?: string;
+  color?: string;
   sort_order: number;
+  questions?: NDIQuestion[];
+}
+
+export interface NDIAcceptanceEvidence {
+  id: string;
+  maturity_level_id: string;
+  evidence_id: number;
+  text_en: string;
+  text_ar: string;
 }
 
 export interface NDIMaturityLevel {
@@ -38,6 +51,7 @@ export interface NDIMaturityLevel {
   description_ar: string;
   acceptance_evidence_en?: string[];
   acceptance_evidence_ar?: string[];
+  acceptance_evidence?: NDIAcceptanceEvidence[];
   related_specifications?: string[];
 }
 
@@ -65,23 +79,23 @@ export interface NDISpecification {
 }
 
 // Assessment types
-export type AssessmentType = "maturity" | "compliance" | "oe";
+export type AssessmentType = "maturity" | "compliance";
 export type AssessmentStatus = "draft" | "in_progress" | "completed" | "archived";
 
 export interface Assessment {
   id: string;
-  organization_id: string;
   assessment_type: AssessmentType;
   status: AssessmentStatus;
   name?: string;
   description?: string;
   target_level?: number;
   current_score?: number;
+  maturity_score?: number;
+  compliance_score?: number;
   created_by?: string;
   created_at: string;
   updated_at: string;
   completed_at?: string;
-  organization?: Organization;
   responses_count: number;
   progress_percentage: number;
 }
@@ -132,6 +146,77 @@ export interface EvidenceAnalysis {
   summary_en?: string;
 }
 
+// Task types
+export type TaskStatus = "pending" | "in_progress" | "completed" | "overdue";
+export type TaskPriority = "low" | "medium" | "high" | "urgent";
+
+export interface Task {
+  id: string;
+  assessment_id: string;
+  question_id?: string;
+  domain_code?: string;
+  assigned_to: string;
+  assigned_by: string;
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  due_date?: string;
+  completed_at?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  assignee?: User;
+  assigner?: User;
+  assessment?: Assessment;
+  question?: NDIQuestion;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  full_name?: string;
+  department?: string;
+  job_title?: string;
+  phone?: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+// Score types
+export interface DomainScoreDetail {
+  domain_code: string;
+  domain_name: string;
+  score: number;
+  level: number;
+  level_name: string;
+  questions_answered: number;
+  total_questions: number;
+}
+
+export interface MaturityScoreResult {
+  assessment_id: string;
+  overall_score: number;
+  overall_level: number;
+  overall_level_name: string;
+  domain_scores: DomainScoreDetail[];
+  calculated_at: string;
+}
+
+export interface ComplianceScoreResult {
+  assessment_id: string;
+  overall_compliance: number;
+  domain_compliance: {
+    domain_code: string;
+    domain_name: string;
+    compliance_percentage: number;
+    specifications_met: number;
+    total_specifications: number;
+  }[];
+  calculated_at: string;
+}
+
 // Report types
 export interface DomainScore {
   domain: NDIDomain;
@@ -179,6 +264,24 @@ export interface Recommendation {
   expected_outcome: string;
 }
 
+// Dashboard types
+export interface DashboardStats {
+  total_assessments: number;
+  active_assessments: number;
+  completed_assessments: number;
+  average_maturity_score: number;
+  average_compliance_score: number;
+  total_tasks: number;
+  pending_tasks: number;
+  overdue_tasks: number;
+  domain_progress: {
+    domain_code: string;
+    domain_name: string;
+    completion_percentage: number;
+    average_score: number;
+  }[];
+}
+
 // API response types
 export interface PaginatedResponse<T> {
   items: T[];
@@ -208,4 +311,36 @@ export function scoreToLevel(score: number): number {
   if (score < 4.0) return 3;
   if (score < 4.75) return 4;
   return 5;
+}
+
+export function getLevelColor(level: number): string {
+  const colors: Record<number, string> = {
+    0: "bg-gray-500",
+    1: "bg-red-500",
+    2: "bg-orange-500",
+    3: "bg-yellow-500",
+    4: "bg-green-500",
+    5: "bg-emerald-500",
+  };
+  return colors[level] || colors[0];
+}
+
+export function getTaskStatusColor(status: TaskStatus): string {
+  const colors: Record<TaskStatus, string> = {
+    pending: "bg-gray-500",
+    in_progress: "bg-blue-500",
+    completed: "bg-green-500",
+    overdue: "bg-red-500",
+  };
+  return colors[status];
+}
+
+export function getTaskPriorityColor(priority: TaskPriority): string {
+  const colors: Record<TaskPriority, string> = {
+    low: "bg-gray-400",
+    medium: "bg-yellow-500",
+    high: "bg-orange-500",
+    urgent: "bg-red-600",
+  };
+  return colors[priority];
 }

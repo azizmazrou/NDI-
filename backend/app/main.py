@@ -6,14 +6,69 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import select
 
 from app.config import settings as app_settings
-from app.database import init_db, close_db
-from app.routers import assessments, ndi, evidence, ai, tasks, scores, dashboard, reports
+from app.database import init_db, close_db, async_session_maker
+from app.routers import assessments, ndi, evidence, ai, tasks, scores, dashboard, reports, admin
 from app.routers import settings as settings_router
+from app.models.settings import AIProviderConfig
 
 # Ensure uploads directory exists
 os.makedirs(app_settings.upload_dir, exist_ok=True)
+
+
+async def init_default_ai_providers() -> None:
+    """Initialize default AI providers if none exist."""
+    try:
+        async with async_session_maker() as session:
+            result = await session.execute(select(AIProviderConfig))
+            existing = result.scalars().all()
+
+            if not existing:
+                print("Initializing default AI providers...")
+                default_providers = [
+                    AIProviderConfig(
+                        id="openai",
+                        name_en="OpenAI",
+                        name_ar="OpenAI",
+                        model_name="gpt-4",
+                        is_enabled=False,
+                        is_default=False,
+                    ),
+                    AIProviderConfig(
+                        id="claude",
+                        name_en="Claude (Anthropic)",
+                        name_ar="كلود (Anthropic)",
+                        model_name="claude-3-opus-20240229",
+                        is_enabled=False,
+                        is_default=False,
+                    ),
+                    AIProviderConfig(
+                        id="gemini",
+                        name_en="Google Gemini",
+                        name_ar="جوجل جيميني",
+                        model_name="gemini-pro",
+                        is_enabled=False,
+                        is_default=False,
+                    ),
+                    AIProviderConfig(
+                        id="azure",
+                        name_en="Azure OpenAI",
+                        name_ar="Azure OpenAI",
+                        model_name="gpt-4",
+                        is_enabled=False,
+                        is_default=False,
+                    ),
+                ]
+                for provider in default_providers:
+                    session.add(provider)
+                await session.commit()
+                print(f"Created {len(default_providers)} default AI providers.")
+            else:
+                print(f"AI providers already exist ({len(existing)} found).")
+    except Exception as e:
+        print(f"Warning: Could not initialize AI providers: {e}")
 
 
 @asynccontextmanager
@@ -21,6 +76,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
     # Startup
     await init_db()
+    await init_default_ai_providers()
     yield
     # Shutdown
     await close_db()
@@ -59,6 +115,7 @@ app.include_router(reports.router, prefix="/api/v1/reports", tags=["Reports"])
 app.include_router(evidence.router, prefix="/api/v1/evidence", tags=["Evidence"])
 app.include_router(ai.router, prefix="/api/v1/ai", tags=["AI"])
 app.include_router(settings_router.router, prefix="/api/v1/settings", tags=["Settings"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 
 
 @app.get("/")

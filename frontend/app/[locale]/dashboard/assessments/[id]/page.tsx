@@ -28,7 +28,7 @@ export default function AssessmentDetailPage({
   const { data: assessment, loading: loadingAssessment, error: assessmentError, refetch } = useApi(fetchAssessment, [params.id]);
 
   // Fetch domains
-  const fetchDomains = useCallback(() => ndiApi.getDomains(false), []);
+  const fetchDomains = useCallback(() => ndiApi.getDomains(), []);
   const { data: domainsData, loading: loadingDomains } = useApi(fetchDomains, []);
 
   // Fetch responses to calculate domain progress
@@ -101,11 +101,11 @@ export default function AssessmentDetailPage({
             <span>/</span>
             <span>{assessment.name}</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">{assessment.name}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {assessment.name || t(`assessment.${assessment.assessment_type}Assessment`)}
+          </h1>
           <p className="text-muted-foreground">
-            {locale === "ar"
-              ? assessment.organization?.name_ar
-              : assessment.organization?.name_en}
+            {t(`assessment.${assessment.assessment_type}Assessment`)}
           </p>
         </div>
 
@@ -176,10 +176,10 @@ export default function AssessmentDetailPage({
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold">{assessment.target_level}</span>
+              <span className="text-2xl font-bold">{assessment.target_level || 3}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              {getLevelName(assessment.target_level)}
+              {getLevelName(assessment.target_level || 3)}
             </p>
           </CardContent>
         </Card>

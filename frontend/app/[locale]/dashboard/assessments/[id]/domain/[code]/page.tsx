@@ -59,7 +59,7 @@ export default function DomainQuestionsPage({
             justification: r.justification || "",
           };
           if (r.selected_level !== null) {
-            setSavedQuestions((prev) => new Set([...prev, r.question.code]));
+            setSavedQuestions((prev) => new Set([...Array.from(prev), r.question.code]));
           }
         }
       });
@@ -77,7 +77,7 @@ export default function DomainQuestionsPage({
         selected_level: response.level,
         justification: response.justification,
       });
-      setSavedQuestions((prev) => new Set([...prev, questionCode]));
+      setSavedQuestions((prev) => new Set([...Array.from(prev), questionCode]));
     } catch (err) {
       console.error("Failed to save response:", err);
     }

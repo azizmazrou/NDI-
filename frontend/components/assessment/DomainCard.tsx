@@ -33,7 +33,7 @@ export function DomainCard({
   const isComplete = answeredCount === domain.question_count;
 
   return (
-    <Link href={`/${locale}/assessments/${assessmentId}/domain/${domain.code}`}>
+    <Link href={`/${locale}/dashboard/assessments/${assessmentId}/domain/${domain.code}`}>
       <Card className="ndi-card-hover cursor-pointer">
         <CardContent className="p-6">
           <div className="flex items-start justify-between">

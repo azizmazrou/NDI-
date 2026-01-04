@@ -18,58 +18,72 @@ DOMAIN_DESCRIPTIONS = {
     "DG": {
         "description_en": "The exercise of authority and control over the management of data assets.",
         "description_ar": "ممارسة السلطة والسيطرة على إدارة أصول البيانات.",
+        "is_oe_domain": False
     },
     "MCM": {
         "description_en": "Planning, implementation, and control of activities to enable access to high quality, integrated metadata.",
         "description_ar": "تخطيط وتنفيذ ومراقبة الأنشطة لتمكين الوصول إلى البيانات الوصفية المتكاملة عالية الجودة.",
+        "is_oe_domain": False
     },
     "DQ": {
         "description_en": "Planning and implementation of quality management techniques to measure, assess, improve, and ensure the fitness of data for use.",
         "description_ar": "تخطيط وتنفيذ تقنيات إدارة الجودة لقياس وتقييم وتحسين وضمان ملاءمة البيانات للاستخدام.",
+        "is_oe_domain": False
     },
     "DO": {
         "description_en": "Planning, control, and support for structured data assets across the data lifecycle.",
         "description_ar": "تخطيط ومراقبة ودعم أصول البيانات المهيكلة عبر دورة حياة البيانات.",
+        "is_oe_domain": False
     },
     "DCM": {
         "description_en": "Planning, implementation, and control of activities to store, protect, and access data in unstructured sources.",
         "description_ar": "تخطيط وتنفيذ ومراقبة الأنشطة لتخزين وحماية والوصول إلى البيانات في المصادر غير المهيكلة.",
+        "is_oe_domain": False
     },
     "DAM": {
         "description_en": "Defining the blueprint for data assets by establishing standards and best practices.",
         "description_ar": "تحديد المخطط لأصول البيانات من خلال وضع المعايير وأفضل الممارسات.",
+        "is_oe_domain": False
     },
     "DSI": {
         "description_en": "Managing processes related to data movement and consolidation inside and outside the entity.",
         "description_ar": "إدارة العمليات المتعلقة بنقل البيانات وتوحيدها داخل الجهة وخارجها.",
+        "is_oe_domain": False
     },
     "RMD": {
         "description_en": "Managing data for optimal consistency and quality through establishing a single point of reference.",
         "description_ar": "إدارة البيانات لتحقيق الاتساق والجودة المثلى من خلال إنشاء نقطة مرجعية واحدة.",
+        "is_oe_domain": False
     },
     "BIA": {
         "description_en": "Planning, implementing, and controlling processes to extract value from data through analytics.",
         "description_ar": "تخطيط وتنفيذ ومراقبة العمليات لاستخراج القيمة من البيانات من خلال التحليلات.",
+        "is_oe_domain": False
     },
     "DVR": {
         "description_en": "Measuring and tracking the value generated from data assets and initiatives.",
         "description_ar": "قياس وتتبع القيمة المتولدة من أصول البيانات والمبادرات.",
+        "is_oe_domain": False
     },
     "OD": {
         "description_en": "Making data publicly available for use and reuse by external stakeholders.",
         "description_ar": "إتاحة البيانات للعموم للاستخدام وإعادة الاستخدام من قبل الجهات الخارجية.",
+        "is_oe_domain": True
     },
     "FOI": {
         "description_en": "Ensuring public access to information held by government entities.",
         "description_ar": "ضمان وصول الجمهور إلى المعلومات التي تحتفظ بها الجهات الحكومية.",
+        "is_oe_domain": True
     },
     "DC": {
         "description_en": "Categorizing data based on sensitivity and security requirements.",
         "description_ar": "تصنيف البيانات بناءً على متطلبات الحساسية والأمان.",
+        "is_oe_domain": False
     },
     "PDP": {
         "description_en": "Protecting personal data and ensuring compliance with privacy regulations.",
         "description_ar": "حماية البيانات الشخصية وضمان الامتثال للوائح الخصوصية.",
+        "is_oe_domain": False
     }
 }
 
@@ -102,8 +116,8 @@ async def seed_domains(session: AsyncSession, domains_data: list) -> dict:
         # Use raw SQL to insert only columns that exist in DB
         await session.execute(
             text("""
-                INSERT INTO ndi_domains (id, code, name_en, name_ar, description_en, description_ar, question_count, sort_order)
-                VALUES (:id, :code, :name_en, :name_ar, :description_en, :description_ar, :question_count, :sort_order)
+                INSERT INTO ndi_domains (id, code, name_en, name_ar, description_en, description_ar, question_count, is_oe_domain, sort_order)
+                VALUES (:id, :code, :name_en, :name_ar, :description_en, :description_ar, :question_count, :is_oe_domain, :sort_order)
             """),
             {
                 "id": domain_id,
@@ -113,6 +127,7 @@ async def seed_domains(session: AsyncSession, domains_data: list) -> dict:
                 "description_en": extra.get("description_en", ""),
                 "description_ar": extra.get("description_ar", ""),
                 "question_count": data.get("question_count", 0),
+                "is_oe_domain": extra.get("is_oe_domain", False),
                 "sort_order": idx,
             }
         )

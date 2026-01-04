@@ -60,8 +60,8 @@ class NDIMaturityLevelResponse(BaseModel):
     level: int
     name_en: str
     name_ar: str
-    description_en: str
-    description_ar: str
+    description_en: Optional[str] = ""
+    description_ar: Optional[str] = ""
     acceptance_evidence: Optional[list[NDIAcceptanceEvidenceResponse]] = None
 
     class Config:

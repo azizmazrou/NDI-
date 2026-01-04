@@ -16,6 +16,8 @@ import {
   Moon,
   Sun,
   Sparkles,
+  Upload,
+  BookOpen,
 } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "next-themes";
@@ -60,9 +62,19 @@ export default function DashboardLayout({
       label: t("nav.reports"),
     },
     {
+      href: `/${locale}/dashboard/evidence`,
+      icon: <Upload className="h-5 w-5" />,
+      label: locale === "ar" ? "إدارة الأدلة" : "Evidence",
+    },
+    {
       href: `/${locale}/dashboard/chat`,
       icon: <Sparkles className="h-5 w-5" />,
       label: locale === "ar" ? "المساعد الذكي" : "AI Assistant",
+    },
+    {
+      href: `/${locale}/knowledge`,
+      icon: <BookOpen className="h-5 w-5" />,
+      label: locale === "ar" ? "قاعدة المعرفة" : "Knowledge Base",
     },
     {
       href: `/${locale}/dashboard/settings`,

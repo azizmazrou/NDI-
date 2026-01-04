@@ -15,6 +15,8 @@ import {
   Globe,
   Moon,
   Sun,
+  ListTodo,
+  MessageSquare,
 } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "next-themes";
@@ -49,6 +51,11 @@ export default function DashboardLayout({
       label: t("nav.assessments"),
     },
     {
+      href: `/${locale}/dashboard/tasks`,
+      icon: <ListTodo className="h-5 w-5" />,
+      label: t("nav.tasks"),
+    },
+    {
       href: `/${locale}/dashboard/organizations`,
       icon: <Building2 className="h-5 w-5" />,
       label: t("nav.organizations"),
@@ -57,6 +64,11 @@ export default function DashboardLayout({
       href: `/${locale}/dashboard/reports`,
       icon: <FileBarChart className="h-5 w-5" />,
       label: t("nav.reports"),
+    },
+    {
+      href: `/${locale}/dashboard/chat`,
+      icon: <MessageSquare className="h-5 w-5" />,
+      label: t("nav.chat"),
     },
     {
       href: `/${locale}/dashboard/settings`,

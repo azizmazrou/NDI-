@@ -71,7 +71,7 @@ export default function AssessmentDetailPage({
         <div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
             <Link
-              href={`/${locale}/assessments`}
+              href={`/${locale}/dashboard/assessments`}
               className="hover:text-foreground"
             >
               {t("assessment.assessments")}
@@ -88,7 +88,7 @@ export default function AssessmentDetailPage({
         </div>
 
         <div className="flex gap-2">
-          <Link href={`/${locale}/assessments/${params.id}/report`}>
+          <Link href={`/${locale}/dashboard/reports`}>
             <Button variant="outline">
               <FileBarChart className="me-2 h-4 w-4" />
               {t("report.generateReport")}

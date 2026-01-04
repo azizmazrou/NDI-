@@ -38,8 +38,10 @@
   "nav": {
     "dashboard": "لوحة التحكم",
     "assessments": "التقييمات",
+    "tasks": "المهام",
     "organizations": "الجهات",
     "reports": "التقارير",
+    "chat": "المساعد الذكي",
     "settings": "الإعدادات",
     "domains": "مجالات المؤشر",
     "help": "المساعدة",

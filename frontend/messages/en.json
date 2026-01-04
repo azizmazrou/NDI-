@@ -38,8 +38,10 @@
   "nav": {
     "dashboard": "Dashboard",
     "assessments": "Assessments",
+    "tasks": "Tasks",
     "organizations": "Organizations",
     "reports": "Reports",
+    "chat": "AI Chat",
     "settings": "Settings",
     "domains": "NDI Domains",
     "help": "Help",

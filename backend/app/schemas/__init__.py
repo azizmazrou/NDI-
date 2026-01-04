@@ -3,7 +3,7 @@ from app.schemas.ndi import (
     NDIDomainResponse,
     NDIQuestionResponse,
     NDIMaturityLevelResponse,
-    NDISpecificationResponse,
+    NDIAcceptanceEvidenceResponse,
     NDIDomainList,
     NDIQuestionWithLevels,
 )
@@ -53,7 +53,7 @@ __all__ = [
     "NDIDomainResponse",
     "NDIQuestionResponse",
     "NDIMaturityLevelResponse",
-    "NDISpecificationResponse",
+    "NDIAcceptanceEvidenceResponse",
     "NDIDomainList",
     "NDIQuestionWithLevels",
     # Assessment

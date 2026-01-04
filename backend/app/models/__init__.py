@@ -4,8 +4,6 @@ from app.models.ndi import (
     NDIQuestion,
     NDIMaturityLevel,
     NDIAcceptanceEvidence,
-    NDIEvidenceSpecificationMapping,
-    NDISpecification,
 )
 from app.models.assessment import Assessment, AssessmentResponse, AssessmentType, AssessmentStatus
 from app.models.evidence import Evidence
@@ -20,8 +18,6 @@ __all__ = [
     "NDIQuestion",
     "NDIMaturityLevel",
     "NDIAcceptanceEvidence",
-    "NDIEvidenceSpecificationMapping",
-    "NDISpecification",
     # Assessment Models
     "Assessment",
     "AssessmentResponse",

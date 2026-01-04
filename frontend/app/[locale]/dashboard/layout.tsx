@@ -15,6 +15,7 @@ import {
   Globe,
   Moon,
   Sun,
+  Sparkles,
 } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "next-themes";
@@ -57,6 +58,11 @@ export default function DashboardLayout({
       href: `/${locale}/dashboard/reports`,
       icon: <FileBarChart className="h-5 w-5" />,
       label: t("nav.reports"),
+    },
+    {
+      href: `/${locale}/dashboard/chat`,
+      icon: <Sparkles className="h-5 w-5" />,
+      label: locale === "ar" ? "المساعد الذكي" : "AI Assistant",
     },
     {
       href: `/${locale}/dashboard/settings`,

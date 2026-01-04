@@ -224,6 +224,7 @@ async def seed_ndi_data(
         questions_count = 0
         levels_count = 0
         evidence_count = 0
+        spec_count = 0
 
         for q_idx, q_data in enumerate(data["questions"], start=1):
             domain_code = q_data["domain_code"]
@@ -279,13 +280,21 @@ async def seed_ndi_data(
                 )
                 levels_count += 1
 
-                # Create acceptance evidence
+                # Create acceptance evidence with text and specification
                 for ev_idx, ev in enumerate(level_data.get("acceptance_evidence", []), start=1):
                     ev_id = ev.get("id", ev_idx)
                     inherits_from = ev.get("inherits_from_level")
 
+                    # Get text directly from evidence object
+                    text_en = ev.get("text_en") or ""
+                    text_ar = ev.get("text_ar") or ""
+
                     # Get specification code from mapping
                     spec_code = spec_mapping.get((level_data["level"], ev_id))
+
+                    # Log sample data for debugging
+                    if evidence_count < 3:
+                        print(f"    Evidence L{level_data['level']}.{ev_id}: text_en='{text_en[:60]}', spec={spec_code}")
 
                     await db.execute(
                         text("""
@@ -297,14 +306,16 @@ async def seed_ndi_data(
                             "id": uuid.uuid4(),
                             "maturity_level_id": level_id,
                             "evidence_id": ev_id,
-                            "text_en": ev.get("text_en", ""),
-                            "text_ar": ev.get("text_ar", ""),
+                            "text_en": text_en,
+                            "text_ar": text_ar,
                             "inherits_from_level": inherits_from,
                             "specification_code": spec_code,
                             "sort_order": ev_idx,
                         }
                     )
                     evidence_count += 1
+                    if spec_code:
+                        spec_count += 1
 
         await db.commit()
 
@@ -320,6 +331,7 @@ async def seed_ndi_data(
                 "questions": questions_count,
                 "maturity_levels": levels_count,
                 "acceptance_evidence": evidence_count,
+                "with_specification_code": spec_count,
             }
         }
 

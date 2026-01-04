@@ -55,8 +55,6 @@ class NDIQuestion(Base):
     code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)  # e.g., DG.MQ.1
     question_en: Mapped[str] = mapped_column(Text, nullable=False)
     question_ar: Mapped[str] = mapped_column(Text, nullable=False)
-    guidance_en: Mapped[str | None] = mapped_column(Text, nullable=True)
-    guidance_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
     # Relationships

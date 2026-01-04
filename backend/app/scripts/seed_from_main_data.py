@@ -88,6 +88,35 @@ DOMAIN_DESCRIPTIONS = {
 }
 
 
+async def ensure_schema(session: AsyncSession) -> None:
+    """Ensure database schema has all required columns."""
+    print("Checking database schema...")
+
+    # Check if inherits_from_level column exists
+    result = await session.execute(
+        text("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'ndi_acceptance_evidence'
+            AND column_name = 'inherits_from_level'
+        """)
+    )
+    exists = result.scalar_one_or_none()
+
+    if not exists:
+        print("  Adding 'inherits_from_level' column...")
+        await session.execute(
+            text("""
+                ALTER TABLE ndi_acceptance_evidence
+                ADD COLUMN inherits_from_level INTEGER NULL
+            """)
+        )
+        await session.commit()
+        print("  ✅ Column added.")
+    else:
+        print("  Schema is up to date.")
+
+
 async def clear_existing_data(session: AsyncSession) -> None:
     """Clear existing NDI data to avoid duplicates."""
     print("Clearing existing NDI data...")
@@ -191,25 +220,25 @@ async def seed_questions_and_levels(
                 }
             )
 
-            # Create acceptance evidence records
+            # Create acceptance evidence records (including inherited ones)
             ev_counter = 1
             for ev in level_data.get("acceptance_evidence", []):
-                if not ev.get("inherits_from_level"):
-                    await session.execute(
-                        text("""
-                            INSERT INTO ndi_acceptance_evidence (id, maturity_level_id, evidence_id, text_en, text_ar, sort_order)
-                            VALUES (:id, :maturity_level_id, :evidence_id, :text_en, :text_ar, :sort_order)
-                        """),
-                        {
-                            "id": uuid.uuid4(),
-                            "maturity_level_id": level_id,
-                            "evidence_id": ev.get("id", ev_counter),
-                            "text_en": ev.get("text_en", ""),
-                            "text_ar": ev.get("text_ar", ""),
-                            "sort_order": ev_counter,
-                        }
-                    )
-                    ev_counter += 1
+                await session.execute(
+                    text("""
+                        INSERT INTO ndi_acceptance_evidence (id, maturity_level_id, evidence_id, text_en, text_ar, inherits_from_level, sort_order)
+                        VALUES (:id, :maturity_level_id, :evidence_id, :text_en, :text_ar, :inherits_from_level, :sort_order)
+                    """),
+                    {
+                        "id": uuid.uuid4(),
+                        "maturity_level_id": level_id,
+                        "evidence_id": ev.get("id", ev_counter),
+                        "text_en": ev.get("text_en", ""),
+                        "text_ar": ev.get("text_ar", ""),
+                        "inherits_from_level": ev.get("inherits_from_level"),  # None if not inherited
+                        "sort_order": ev_counter,
+                    }
+                )
+                ev_counter += 1
 
         print(f"    Created {len(q_data.get('levels', []))} maturity levels")
 
@@ -237,6 +266,9 @@ async def main():
 
     async with async_session_maker() as session:
         try:
+            # Ensure schema is up to date
+            await ensure_schema(session)
+
             # Clear existing data
             await clear_existing_data(session)
 
@@ -255,11 +287,19 @@ async def main():
             print("✅ NDI data seeded successfully!")
             print("=" * 60)
 
+            # Calculate evidence count
+            total_evidence = sum(
+                len(level.get("acceptance_evidence", []))
+                for q in data["questions"]
+                for level in q.get("levels", [])
+            )
+
             # Print summary
             print(f"\nSummary:")
             print(f"  - Domains: {len(data['domains'])}")
             print(f"  - Questions: {len(data['questions'])}")
             print(f"  - Maturity Levels: {len(data['questions']) * 6} (6 per question)")
+            print(f"  - Acceptance Evidence: {total_evidence}")
 
         except Exception as e:
             await session.rollback()

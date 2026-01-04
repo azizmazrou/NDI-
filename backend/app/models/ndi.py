@@ -132,6 +132,7 @@ class NDIAcceptanceEvidence(Base):
     evidence_id: Mapped[int] = mapped_column(Integer, nullable=False)  # Sequential: 1, 2, 3...
     text_en: Mapped[str] = mapped_column(Text, nullable=False)
     text_ar: Mapped[str] = mapped_column(Text, nullable=False)
+    inherits_from_level: Mapped[int | None] = mapped_column(Integer, nullable=True)  # If set, inherits from this level
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
     # Relationships

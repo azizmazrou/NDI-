@@ -41,10 +41,14 @@ export default function ReportsPage() {
 
   async function loadAssessments() {
     try {
-      const data = await assessmentsApi.list({ status: "completed" });
-      setAssessments(data.items || []);
-      if (data.items?.length > 0) {
-        setSelectedAssessmentId(data.items[0].id);
+      // Load all assessments (not just completed) so users can view reports for in-progress ones too
+      const data = await assessmentsApi.list({ page_size: 100 });
+      const validAssessments = (data.items || []).filter(
+        (a: Assessment) => a.status === "completed" || a.status === "in_progress"
+      );
+      setAssessments(validAssessments);
+      if (validAssessments.length > 0) {
+        setSelectedAssessmentId(validAssessments[0].id);
       }
     } catch (error) {
       console.error("Failed to load assessments:", error);

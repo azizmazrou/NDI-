@@ -28,21 +28,21 @@ def maturity_level_to_response(ml: NDIMaturityLevel) -> NDIMaturityLevelResponse
         level=ml.level,
         name_en=ml.name_en,
         name_ar=ml.name_ar,
-        description_en=ml.description_en,
-        description_ar=ml.description_ar,
+        description_en=ml.description_en or "",
+        description_ar=ml.description_ar or "",
         acceptance_evidence=[
             NDIAcceptanceEvidenceResponse(
                 id=ev.id,
                 maturity_level_id=ev.maturity_level_id,
                 evidence_id=ev.evidence_id,
-                text_en=ev.text_en,
-                text_ar=ev.text_ar,
+                text_en=ev.text_en or "",
+                text_ar=ev.text_ar or "",
                 inherits_from_level=ev.inherits_from_level,
                 specification_code=ev.specification_code,
-                sort_order=ev.sort_order,
+                sort_order=ev.sort_order or 0,
             )
-            for ev in sorted(ml.acceptance_evidence, key=lambda x: x.sort_order)
-        ] if ml.acceptance_evidence else None,
+            for ev in sorted(ml.acceptance_evidence, key=lambda x: x.sort_order or 0)
+        ] if ml.acceptance_evidence else [],
     )
 
 

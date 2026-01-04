@@ -88,31 +88,43 @@ DOMAIN_DESCRIPTIONS = {
 }
 
 
-async def ensure_schema(session: AsyncSession) -> None:
-    """Ensure database schema has all required columns."""
-    print("Checking database schema...")
-
-    # Check if inherits_from_level column exists
+async def check_column_exists(session: AsyncSession, table: str, column: str) -> bool:
+    """Check if a column exists in a table."""
     result = await session.execute(
         text("""
             SELECT column_name
             FROM information_schema.columns
-            WHERE table_name = 'ndi_acceptance_evidence'
-            AND column_name = 'inherits_from_level'
-        """)
+            WHERE table_name = :table AND column_name = :column
+        """),
+        {"table": table, "column": column}
     )
-    exists = result.scalar_one_or_none()
+    return result.scalar_one_or_none() is not None
 
-    if not exists:
-        print("  Adding 'inherits_from_level' column...")
-        await session.execute(
-            text("""
-                ALTER TABLE ndi_acceptance_evidence
-                ADD COLUMN inherits_from_level INTEGER NULL
-            """)
-        )
+
+async def ensure_schema(session: AsyncSession) -> None:
+    """Ensure database schema has all required columns."""
+    print("Checking database schema...")
+    changes = 0
+
+    # Schema updates needed
+    schema_updates = [
+        ("ndi_acceptance_evidence", "inherits_from_level", "INTEGER NULL"),
+        ("ndi_domains", "icon", "VARCHAR(50) NULL"),
+        ("ndi_domains", "color", "VARCHAR(20) NULL"),
+        ("ndi_domains", "is_oe_domain", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ]
+
+    for table, column, col_def in schema_updates:
+        if not await check_column_exists(session, table, column):
+            print(f"  Adding '{table}.{column}'...")
+            await session.execute(
+                text(f"ALTER TABLE {table} ADD COLUMN {column} {col_def}")
+            )
+            changes += 1
+
+    if changes > 0:
         await session.commit()
-        print("  ✅ Column added.")
+        print(f"  ✅ Added {changes} column(s).")
     else:
         print("  Schema is up to date.")
 

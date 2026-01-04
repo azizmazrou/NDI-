@@ -29,6 +29,7 @@ class NDIDomain(Base):
     question_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     icon: Mapped[str | None] = mapped_column(String(50), nullable=True)
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    is_oe_domain: Mapped[bool] = mapped_column(Boolean, default=False)  # Open Entity domain
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
     # Relationships

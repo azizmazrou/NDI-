@@ -10,10 +10,25 @@ import {
   AlertCircle,
   PlayCircle,
   Circle,
+  Plus,
+  Loader2,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -21,8 +36,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { tasksApi } from "@/lib/api";
-import type { Task, TaskStatus, TaskPriority } from "@/types/ndi";
+import { tasksApi, assessmentsApi, usersApi } from "@/lib/api";
+import type { Task, TaskStatus, TaskPriority, Assessment } from "@/types/ndi";
 
 export default function TasksPage() {
   const t = useTranslations();
@@ -34,9 +49,38 @@ export default function TasksPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [view, setView] = useState<"my" | "assigned">("my");
 
+  // Create task dialog state
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [newTask, setNewTask] = useState({
+    title: "",
+    description: "",
+    assessment_id: "",
+    assigned_to: "",
+    priority: "medium" as TaskPriority,
+    due_date: "",
+    domain_code: "",
+  });
+
   useEffect(() => {
     loadTasks();
+    loadFormData();
   }, [view]);
+
+  async function loadFormData() {
+    try {
+      const [assessmentsData, usersData] = await Promise.all([
+        assessmentsApi.list({ page_size: 100 }).catch(() => ({ items: [] })),
+        usersApi.list({ page_size: 100, is_active: true }).catch(() => ({ items: [] })),
+      ]);
+      setAssessments(assessmentsData.items || []);
+      setUsers(usersData.items || []);
+    } catch (error) {
+      console.error("Failed to load form data:", error);
+    }
+  }
 
   async function loadTasks() {
     setLoading(true);
@@ -59,6 +103,40 @@ export default function TasksPage() {
       loadTasks();
     } catch (error) {
       console.error("Failed to update task:", error);
+    }
+  }
+
+  async function handleCreateTask() {
+    if (!newTask.title || !newTask.assessment_id || !newTask.assigned_to) {
+      return;
+    }
+
+    setCreating(true);
+    try {
+      await tasksApi.create({
+        title: newTask.title,
+        description: newTask.description || undefined,
+        assessment_id: newTask.assessment_id,
+        assigned_to: newTask.assigned_to,
+        priority: newTask.priority,
+        due_date: newTask.due_date || undefined,
+        domain_code: newTask.domain_code || undefined,
+      });
+      setIsCreateDialogOpen(false);
+      setNewTask({
+        title: "",
+        description: "",
+        assessment_id: "",
+        assigned_to: "",
+        priority: "medium",
+        due_date: "",
+        domain_code: "",
+      });
+      loadTasks();
+    } catch (error) {
+      console.error("Failed to create task:", error);
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -117,6 +195,146 @@ export default function TasksPage() {
               : "Manage your assigned tasks"}
           </p>
         </div>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 me-2" />
+              {locale === "ar" ? "مهمة جديدة" : "New Task"}
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>
+                {locale === "ar" ? "إنشاء مهمة جديدة" : "Create New Task"}
+              </DialogTitle>
+              <DialogDescription>
+                {locale === "ar"
+                  ? "أدخل تفاصيل المهمة الجديدة"
+                  : "Enter the details for the new task"}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="title">
+                  {locale === "ar" ? "عنوان المهمة *" : "Task Title *"}
+                </Label>
+                <Input
+                  id="title"
+                  value={newTask.title}
+                  onChange={(e) => setNewTask(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder={locale === "ar" ? "أدخل عنوان المهمة" : "Enter task title"}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">
+                  {locale === "ar" ? "الوصف" : "Description"}
+                </Label>
+                <Textarea
+                  id="description"
+                  value={newTask.description}
+                  onChange={(e) => setNewTask(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder={locale === "ar" ? "أدخل وصف المهمة" : "Enter task description"}
+                  rows={3}
+                />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>{locale === "ar" ? "التقييم *" : "Assessment *"}</Label>
+                  <Select
+                    value={newTask.assessment_id}
+                    onValueChange={(value) => setNewTask(prev => ({ ...prev, assessment_id: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={locale === "ar" ? "اختر التقييم" : "Select assessment"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {assessments.map((assessment) => (
+                        <SelectItem key={assessment.id} value={assessment.id}>
+                          {assessment.name || t(`assessment.${assessment.assessment_type}Assessment`)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{locale === "ar" ? "تعيين إلى *" : "Assign To *"}</Label>
+                  <Select
+                    value={newTask.assigned_to}
+                    onValueChange={(value) => setNewTask(prev => ({ ...prev, assigned_to: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={locale === "ar" ? "اختر المستخدم" : "Select user"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.full_name || user.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>{locale === "ar" ? "الأولوية" : "Priority"}</Label>
+                  <Select
+                    value={newTask.priority}
+                    onValueChange={(value) => setNewTask(prev => ({ ...prev, priority: value as TaskPriority }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="urgent">{t("task.urgent")}</SelectItem>
+                      <SelectItem value="high">{t("task.high")}</SelectItem>
+                      <SelectItem value="medium">{t("task.medium")}</SelectItem>
+                      <SelectItem value="low">{t("task.low")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="due_date">
+                    {locale === "ar" ? "تاريخ الاستحقاق" : "Due Date"}
+                  </Label>
+                  <Input
+                    id="due_date"
+                    type="date"
+                    value={newTask.due_date}
+                    onChange={(e) => setNewTask(prev => ({ ...prev, due_date: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="domain_code">
+                  {locale === "ar" ? "كود المجال" : "Domain Code"}
+                </Label>
+                <Input
+                  id="domain_code"
+                  value={newTask.domain_code}
+                  onChange={(e) => setNewTask(prev => ({ ...prev, domain_code: e.target.value }))}
+                  placeholder={locale === "ar" ? "مثال: DG" : "e.g., DG"}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                {locale === "ar" ? "إلغاء" : "Cancel"}
+              </Button>
+              <Button
+                onClick={handleCreateTask}
+                disabled={creating || !newTask.title || !newTask.assessment_id || !newTask.assigned_to}
+              >
+                {creating ? (
+                  <Loader2 className="h-4 w-4 animate-spin me-2" />
+                ) : (
+                  <Plus className="h-4 w-4 me-2" />
+                )}
+                {locale === "ar" ? "إنشاء المهمة" : "Create Task"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* View Toggle */}

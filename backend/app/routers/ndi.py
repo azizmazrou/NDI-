@@ -1,5 +1,5 @@
 """NDI data router."""
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models.ndi import NDIDomain, NDIQuestion, NDIMaturityLevel, NDISpecification, NDIAcceptanceEvidence
+from app.models.ndi import NDIDomain, NDIQuestion, NDIMaturityLevel, NDIAcceptanceEvidence
 from app.schemas.ndi import (
     NDIDomainResponse,
     NDIDomainList,
@@ -16,8 +16,6 @@ from app.schemas.ndi import (
     NDIQuestionWithLevels,
     NDIMaturityLevelResponse,
     NDIAcceptanceEvidenceResponse,
-    NDISpecificationResponse,
-    NDISpecificationList,
     NDIDomainWithQuestions,
 )
 
@@ -33,10 +31,20 @@ def maturity_level_to_response(ml: NDIMaturityLevel) -> NDIMaturityLevelResponse
         description_en=ml.description_en,
         description_ar=ml.description_ar,
         acceptance_evidence=[
-            NDIAcceptanceEvidenceResponse.model_validate(ev)
+            NDIAcceptanceEvidenceResponse(
+                id=ev.id,
+                maturity_level_id=ev.maturity_level_id,
+                evidence_id=ev.evidence_id,
+                text_en=ev.text_en,
+                text_ar=ev.text_ar,
+                inherits_from_level=ev.inherits_from_level,
+                specification_code=ev.specification_code,
+                sort_order=ev.sort_order,
+            )
             for ev in sorted(ml.acceptance_evidence, key=lambda x: x.sort_order)
         ] if ml.acceptance_evidence else None,
     )
+
 
 router = APIRouter()
 
@@ -62,14 +70,13 @@ async def get_domain(
     code: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Get domain with questions and specifications."""
+    """Get domain with questions."""
     result = await db.execute(
         select(NDIDomain)
         .options(
             selectinload(NDIDomain.questions)
             .selectinload(NDIQuestion.maturity_levels)
             .selectinload(NDIMaturityLevel.acceptance_evidence),
-            selectinload(NDIDomain.specifications),
         )
         .where(NDIDomain.code == code.upper())
     )
@@ -104,10 +111,6 @@ async def get_domain(
                 ],
             )
             for q in sorted(domain.questions, key=lambda x: x.sort_order)
-        ],
-        specifications=[
-            NDISpecificationResponse.model_validate(s)
-            for s in sorted(domain.specifications, key=lambda x: x.sort_order)
         ],
     )
 
@@ -169,7 +172,7 @@ async def get_question(
             .selectinload(NDIMaturityLevel.acceptance_evidence),
             selectinload(NDIQuestion.domain),
         )
-        .where(NDIQuestion.code == code.upper())
+        .where(NDIQuestion.code == code)
     )
     question = result.scalar_one_or_none()
 
@@ -199,7 +202,7 @@ async def get_question_levels(
     """Get maturity levels for a question with acceptance evidence."""
     # Get the question first
     question_result = await db.execute(
-        select(NDIQuestion).where(NDIQuestion.code == code.upper())
+        select(NDIQuestion).where(NDIQuestion.code == code)
     )
     question = question_result.scalar_one_or_none()
 
@@ -217,49 +220,49 @@ async def get_question_levels(
     return [maturity_level_to_response(ml) for ml in levels]
 
 
-@router.get("/specifications", response_model=NDISpecificationList)
+@router.get("/specifications")
 async def list_specifications(
     domain_code: Optional[str] = None,
-    maturity_level: Optional[int] = Query(None, ge=1, le=5),
+    maturity_level: Optional[int] = Query(None, ge=0, le=5),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all specifications with optional filtering."""
-    query = select(NDISpecification)
+    """
+    List specification codes from evidence data.
+    Since specifications are now embedded in evidence, this returns unique spec codes.
+    """
+    from sqlalchemy import text
 
+    query = """
+        SELECT DISTINCT ae.specification_code, d.code as domain_code, ml.level
+        FROM ndi_acceptance_evidence ae
+        JOIN ndi_maturity_levels ml ON ae.maturity_level_id = ml.id
+        JOIN ndi_questions q ON ml.question_id = q.id
+        JOIN ndi_domains d ON q.domain_id = d.id
+        WHERE ae.specification_code IS NOT NULL
+    """
+
+    params = {}
     if domain_code:
-        # Get domain ID
-        domain_result = await db.execute(
-            select(NDIDomain).where(NDIDomain.code == domain_code.upper())
-        )
-        domain = domain_result.scalar_one_or_none()
-        if domain:
-            query = query.where(NDISpecification.domain_id == domain.id)
+        query += " AND d.code = :domain_code"
+        params["domain_code"] = domain_code.upper()
 
-    if maturity_level:
-        query = query.where(NDISpecification.maturity_level == maturity_level)
+    if maturity_level is not None:
+        query += " AND ml.level = :level"
+        params["level"] = maturity_level
 
-    query = query.order_by(NDISpecification.sort_order)
-    result = await db.execute(query)
-    specifications = result.scalars().all()
+    query += " ORDER BY ae.specification_code"
 
-    return NDISpecificationList(
-        items=[NDISpecificationResponse.model_validate(s) for s in specifications],
-        total=len(specifications),
-    )
+    result = await db.execute(text(query), params)
+    rows = result.fetchall()
 
-
-@router.get("/specifications/{code}", response_model=NDISpecificationResponse)
-async def get_specification(
-    code: str,
-    db: AsyncSession = Depends(get_db),
-):
-    """Get a specific specification."""
-    result = await db.execute(
-        select(NDISpecification).where(NDISpecification.code == code.upper())
-    )
-    specification = result.scalar_one_or_none()
-
-    if not specification:
-        raise HTTPException(status_code=404, detail="Specification not found")
-
-    return NDISpecificationResponse.model_validate(specification)
+    return {
+        "items": [
+            {
+                "specification_code": row[0],
+                "domain_code": row[1],
+                "maturity_level": row[2],
+            }
+            for row in rows
+        ],
+        "total": len(rows),
+    }

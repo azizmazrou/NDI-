@@ -39,6 +39,9 @@ export interface NDIAcceptanceEvidence {
   evidence_id: number;
   text_en: string;
   text_ar: string;
+  inherits_from_level?: number;  // If set, this evidence inherits from a lower level
+  specification_code?: string;   // e.g., DG.1.1 - links to compliance requirements
+  sort_order?: number;
 }
 
 export interface NDIMaturityLevel {
@@ -49,10 +52,7 @@ export interface NDIMaturityLevel {
   name_ar: string;
   description_en: string;
   description_ar: string;
-  acceptance_evidence_en?: string[];
-  acceptance_evidence_ar?: string[];
   acceptance_evidence?: NDIAcceptanceEvidence[];
-  related_specifications?: string[];
 }
 
 export interface NDIQuestion {

@@ -6,17 +6,18 @@ API endpoints for administrative tasks like data seeding
 import json
 import uuid
 from pathlib import Path
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, text
+from sqlalchemy import text
 
 from app.database import get_db
 
 router = APIRouter(prefix="/admin", tags=["Admin - الإدارة"])
 
 
-# Domain descriptions
+# Domain descriptions (OE = Open Entity domains)
 DOMAIN_DESCRIPTIONS = {
     "DG": {
         "description_en": "The exercise of authority and control over the management of data assets.",
@@ -91,11 +92,68 @@ DOMAIN_DESCRIPTIONS = {
 }
 
 
+async def truncate_ndi_tables(db: AsyncSession) -> None:
+    """Truncate all NDI-related tables."""
+    # Order matters - truncate in reverse dependency order
+    tables_to_truncate = [
+        "ndi_acceptance_evidence",
+        "ndi_maturity_levels",
+        "ndi_questions",
+        "ndi_domains",
+    ]
+
+    # Also try to drop old tables that are no longer needed
+    old_tables = [
+        "ndi_evidence_specification_mapping",
+        "ndi_specifications",
+    ]
+
+    for table in tables_to_truncate:
+        try:
+            await db.execute(text(f"TRUNCATE TABLE {table} CASCADE"))
+        except Exception as e:
+            print(f"Warning: Could not truncate {table}: {e}")
+
+    for table in old_tables:
+        try:
+            await db.execute(text(f"DROP TABLE IF EXISTS {table} CASCADE"))
+        except Exception as e:
+            print(f"Warning: Could not drop {table}: {e}")
+
+    await db.commit()
+
+
+async def ensure_schema(db: AsyncSession) -> None:
+    """Ensure database schema has the specification_code column."""
+    try:
+        # Check if specification_code column exists
+        result = await db.execute(text("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'ndi_acceptance_evidence' AND column_name = 'specification_code'
+        """))
+        if not result.scalar_one_or_none():
+            await db.execute(text("""
+                ALTER TABLE ndi_acceptance_evidence
+                ADD COLUMN specification_code VARCHAR(20) NULL
+            """))
+            await db.commit()
+            print("Added specification_code column to ndi_acceptance_evidence")
+    except Exception as e:
+        print(f"Warning: Schema update failed: {e}")
+
+
 @router.post("/seed-ndi-data")
-async def seed_ndi_data(db: AsyncSession = Depends(get_db)):
+async def seed_ndi_data(
+    force: bool = Query(False, description="Force reseed by truncating existing data"),
+    db: AsyncSession = Depends(get_db)
+):
     """
     Seed NDI data from main-data.json
     تحميل بيانات مؤشر البيانات الوطني من الملف الرئيسي
+
+    - If force=true, truncates all existing NDI data before seeding
+    - Creates domains, questions, maturity levels, and acceptance evidence
+    - Links evidence to specification codes for compliance scoring
     """
     # Path to data file
     data_file = Path(__file__).parent.parent.parent.parent / "data" / "main-data.json"
@@ -111,18 +169,30 @@ async def seed_ndi_data(db: AsyncSession = Depends(get_db)):
         with open(data_file, "r", encoding="utf-8") as f:
             data = json.load(f)
 
+        metadata = data.get("metadata", {})
+
         # Check if data already exists
         result = await db.execute(text("SELECT COUNT(*) FROM ndi_domains"))
-        count = result.scalar()
+        existing_count = result.scalar() or 0
 
-        if count > 0:
+        if existing_count > 0 and not force:
             return {
                 "status": "skipped",
-                "message": f"NDI data already exists ({count} domains found). Use force=true to reseed.",
-                "domains_count": count
+                "message": f"NDI data already exists ({existing_count} domains). Use force=true to reseed.",
+                "domains_count": existing_count,
+                "hint": "POST /api/v1/admin/seed-ndi-data?force=true"
             }
 
+        # Truncate existing data if force=true or if data exists
+        if force or existing_count > 0:
+            print("Truncating existing NDI data...")
+            await truncate_ndi_tables(db)
+
+        # Ensure schema is up to date
+        await ensure_schema(db)
+
         # Seed domains
+        print("Seeding domains...")
         domain_map = {}
         for idx, domain_data in enumerate(data["domains"], start=1):
             code = domain_data["code"]
@@ -147,16 +217,20 @@ async def seed_ndi_data(db: AsyncSession = Depends(get_db)):
                 }
             )
             domain_map[code] = domain_id
+            print(f"  Created domain: {code}")
 
         # Seed questions and maturity levels
+        print("Seeding questions and maturity levels...")
         questions_count = 0
         levels_count = 0
+        evidence_count = 0
 
         for q_idx, q_data in enumerate(data["questions"], start=1):
             domain_code = q_data["domain_code"]
             domain_id = domain_map.get(domain_code)
 
             if not domain_id:
+                print(f"  Warning: Domain {domain_code} not found, skipping question {q_data['code']}")
                 continue
 
             question_id = uuid.uuid4()
@@ -175,6 +249,15 @@ async def seed_ndi_data(db: AsyncSession = Depends(get_db)):
                 }
             )
             questions_count += 1
+            print(f"  Created question: {q_data['code']}")
+
+            # Build specification code mapping for this question
+            spec_mapping = {}  # {(level, evidence_id): specification_code}
+            for level_data in q_data.get("levels", []):
+                for mapping in level_data.get("evidence_specification_mapping", []):
+                    if mapping.get("specification_code"):
+                        key = (level_data["level"], mapping["evidence_id"])
+                        spec_mapping[key] = mapping["specification_code"]
 
             # Create maturity levels
             for level_data in q_data.get("levels", []):
@@ -198,30 +281,46 @@ async def seed_ndi_data(db: AsyncSession = Depends(get_db)):
 
                 # Create acceptance evidence
                 for ev_idx, ev in enumerate(level_data.get("acceptance_evidence", []), start=1):
+                    ev_id = ev.get("id", ev_idx)
+                    inherits_from = ev.get("inherits_from_level")
+
+                    # Get specification code from mapping
+                    spec_code = spec_mapping.get((level_data["level"], ev_id))
+
                     await db.execute(
                         text("""
-                            INSERT INTO ndi_acceptance_evidence (id, maturity_level_id, evidence_id, text_en, text_ar, inherits_from_level, sort_order)
-                            VALUES (:id, :maturity_level_id, :evidence_id, :text_en, :text_ar, :inherits_from_level, :sort_order)
+                            INSERT INTO ndi_acceptance_evidence
+                            (id, maturity_level_id, evidence_id, text_en, text_ar, inherits_from_level, specification_code, sort_order)
+                            VALUES (:id, :maturity_level_id, :evidence_id, :text_en, :text_ar, :inherits_from_level, :specification_code, :sort_order)
                         """),
                         {
                             "id": uuid.uuid4(),
                             "maturity_level_id": level_id,
-                            "evidence_id": ev.get("id", ev_idx),
+                            "evidence_id": ev_id,
                             "text_en": ev.get("text_en", ""),
                             "text_ar": ev.get("text_ar", ""),
-                            "inherits_from_level": ev.get("inherits_from_level"),
+                            "inherits_from_level": inherits_from,
+                            "specification_code": spec_code,
                             "sort_order": ev_idx,
                         }
                     )
+                    evidence_count += 1
 
         await db.commit()
 
         return {
             "status": "success",
             "message": "NDI data seeded successfully",
-            "domains_count": len(data["domains"]),
-            "questions_count": questions_count,
-            "levels_count": levels_count,
+            "metadata": {
+                "version": metadata.get("version"),
+                "source": metadata.get("source"),
+            },
+            "counts": {
+                "domains": len(data["domains"]),
+                "questions": questions_count,
+                "maturity_levels": levels_count,
+                "acceptance_evidence": evidence_count,
+            }
         }
 
     except Exception as e:
@@ -239,35 +338,78 @@ async def get_status(db: AsyncSession = Depends(get_db)):
     الحصول على حالة النظام بما في ذلك عدد البيانات
     """
     try:
-        # Count domains
-        domains_result = await db.execute(text("SELECT COUNT(*) FROM ndi_domains"))
-        domains_count = domains_result.scalar() or 0
+        counts = {}
 
-        # Count questions
-        questions_result = await db.execute(text("SELECT COUNT(*) FROM ndi_questions"))
-        questions_count = questions_result.scalar() or 0
+        # Count NDI data
+        for table, key in [
+            ("ndi_domains", "ndi_domains"),
+            ("ndi_questions", "ndi_questions"),
+            ("ndi_maturity_levels", "ndi_maturity_levels"),
+            ("ndi_acceptance_evidence", "ndi_acceptance_evidence"),
+        ]:
+            try:
+                result = await db.execute(text(f"SELECT COUNT(*) FROM {table}"))
+                counts[key] = result.scalar() or 0
+            except:
+                counts[key] = 0
 
-        # Count AI providers
-        providers_result = await db.execute(text("SELECT COUNT(*) FROM ai_provider_configs"))
-        providers_count = providers_result.scalar() or 0
+        # Count other data
+        for table, key in [
+            ("ai_provider_configs", "ai_providers"),
+            ("assessments", "assessments"),
+            ("assessment_responses", "assessment_responses"),
+            ("tasks", "tasks"),
+            ("users", "users"),
+        ]:
+            try:
+                result = await db.execute(text(f"SELECT COUNT(*) FROM {table}"))
+                counts[key] = result.scalar() or 0
+            except:
+                counts[key] = 0
 
-        # Count assessments
-        assessments_result = await db.execute(text("SELECT COUNT(*) FROM assessments"))
-        assessments_count = assessments_result.scalar() or 0
+        # Count specification codes in evidence
+        try:
+            result = await db.execute(text(
+                "SELECT COUNT(DISTINCT specification_code) FROM ndi_acceptance_evidence WHERE specification_code IS NOT NULL"
+            ))
+            counts["unique_specification_codes"] = result.scalar() or 0
+        except:
+            counts["unique_specification_codes"] = 0
 
         return {
             "status": "healthy",
-            "data": {
-                "ndi_domains": domains_count,
-                "ndi_questions": questions_count,
-                "ai_providers": providers_count,
-                "assessments": assessments_count,
-            },
-            "ndi_data_seeded": domains_count > 0,
-            "ai_providers_initialized": providers_count > 0,
+            "data": counts,
+            "ndi_data_seeded": counts.get("ndi_domains", 0) > 0,
+            "ai_providers_initialized": counts.get("ai_providers", 0) > 0,
         }
     except Exception as e:
         return {
             "status": "error",
             "error": str(e)
         }
+
+
+@router.delete("/reset-assessments")
+async def reset_assessments(db: AsyncSession = Depends(get_db)):
+    """
+    Reset all assessments and related data (for testing)
+    إعادة تعيين جميع التقييمات والبيانات ذات الصلة (للاختبار)
+    """
+    try:
+        # Delete in order of dependencies
+        await db.execute(text("DELETE FROM evidence"))
+        await db.execute(text("DELETE FROM tasks"))
+        await db.execute(text("DELETE FROM assessment_responses"))
+        await db.execute(text("DELETE FROM assessments"))
+        await db.commit()
+
+        return {
+            "status": "success",
+            "message": "All assessments and related data have been reset"
+        }
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to reset assessments: {str(e)}"
+        )

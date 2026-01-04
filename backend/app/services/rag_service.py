@@ -6,7 +6,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.embedding import Embedding
-from app.models.ndi import NDIDomain, NDIQuestion, NDIMaturityLevel, NDISpecification
+from app.models.ndi import NDIDomain, NDIQuestion, NDIMaturityLevel, NDIAcceptanceEvidence
 from app.config import settings
 
 
@@ -137,22 +137,23 @@ class RAGService:
             })
             context_parts.append(content)
 
-        # Search in specifications
-        title_col = "title_ar" if language == "ar" else "title_en"
+        # Search in acceptance evidence with specification codes
+        text_col = "text_ar" if language == "ar" else "text_en"
 
-        specs_result = await self.db.execute(
-            select(NDISpecification)
-            .where(getattr(NDISpecification, title_col).ilike(f"%{query}%"))
+        evidence_result = await self.db.execute(
+            select(NDIAcceptanceEvidence)
+            .where(NDIAcceptanceEvidence.specification_code.isnot(None))
+            .where(getattr(NDIAcceptanceEvidence, text_col).ilike(f"%{query}%"))
             .limit(top_k)
         )
-        specs = specs_result.scalars().all()
+        evidences = evidence_result.scalars().all()
 
-        for spec in specs:
-            content = f"[{spec.code}] {getattr(spec, title_col)}"
+        for ev in evidences:
+            content = f"[{ev.specification_code}] {getattr(ev, text_col)}"
             sources.append({
                 "type": "specification",
-                "id": str(spec.id),
-                "code": spec.code,
+                "id": str(ev.id),
+                "code": ev.specification_code,
                 "content": content,
             })
             context_parts.append(content)
@@ -252,20 +253,23 @@ class RAGService:
             )
             count += 1
 
-        # Index specifications
-        specs_result = await self.db.execute(select(NDISpecification))
-        specs = specs_result.scalars().all()
+        # Index acceptance evidence with specification codes
+        evidence_result = await self.db.execute(
+            select(NDIAcceptanceEvidence)
+            .where(NDIAcceptanceEvidence.specification_code.isnot(None))
+        )
+        evidences = evidence_result.scalars().all()
 
-        for spec in specs:
+        for ev in evidences:
             await self._index_item(
                 source_type="specification",
-                source_id=spec.id,
-                content_en=f"[{spec.code}] {spec.title_en}: {spec.description_en or ''}",
-                content_ar=f"[{spec.code}] {spec.title_ar}: {spec.description_ar or ''}",
+                source_id=ev.id,
+                content_en=f"[{ev.specification_code}] {ev.text_en}",
+                content_ar=f"[{ev.specification_code}] {ev.text_ar}",
                 metadata={
-                    "code": spec.code,
-                    "domain_id": str(spec.domain_id),
-                    "maturity_level": spec.maturity_level,
+                    "code": ev.specification_code,
+                    "maturity_level_id": str(ev.maturity_level_id),
+                    "evidence_id": ev.evidence_id,
                 },
             )
             count += 1

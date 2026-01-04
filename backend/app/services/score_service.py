@@ -12,7 +12,6 @@ from app.models.ndi import (
     NDIQuestion,
     NDIMaturityLevel,
     NDIAcceptanceEvidence,
-    NDIEvidenceSpecificationMapping,
 )
 from app.models.evidence import Evidence
 from app.schemas.score import (
@@ -91,7 +90,6 @@ class ScoreService:
             select(NDIMaturityLevel)
             .options(
                 selectinload(NDIMaturityLevel.acceptance_evidence),
-                selectinload(NDIMaturityLevel.evidence_mappings),
             )
             .where(NDIMaturityLevel.question_id == question_id)
             .where(NDIMaturityLevel.level == level)
@@ -173,8 +171,8 @@ class ScoreService:
 
         الخطوات:
         1. لكل إجابة، جلب المستوى المختار
-        2. جلب جدول الربط (evidence_specification_mapping) للمستوى
-        3. لكل ربط، تحقق هل الشاهد (evidence_id) مرفوع؟
+        2. جلب acceptance_evidence مع specification_code للمستوى
+        3. لكل شاهد له specification_code، تحقق هل الشاهد مرفوع؟
         4. إذا مرفوع = المواصفة ممتثلة
         """
         responses = await self._get_responses(assessment_id)
@@ -185,25 +183,29 @@ class ScoreService:
             if response.selected_level is None:
                 continue
 
-            # Get maturity level with mappings
+            # Get maturity level with acceptance evidence
             maturity_level = await self._get_maturity_level(
                 response.question_id,
                 response.selected_level
             )
 
-            if not maturity_level or not maturity_level.evidence_mappings:
+            if not maturity_level or not maturity_level.acceptance_evidence:
                 continue
 
             # Get uploaded evidence IDs
             uploaded_evidence_ids = [ev.evidence_id for ev in response.evidence if ev.evidence_id]
 
-            for mapping in maturity_level.evidence_mappings:
-                is_uploaded = mapping.evidence_id in uploaded_evidence_ids
+            # Check each evidence with specification_code
+            for evidence in maturity_level.acceptance_evidence:
+                if not evidence.specification_code:
+                    continue  # Skip evidence without specification code
+
+                is_uploaded = evidence.evidence_id in uploaded_evidence_ids
 
                 specifications_status.append(SpecificationStatus(
-                    specification_code=mapping.specification_code,
+                    specification_code=evidence.specification_code,
                     question_code=response.question.code if response.question else "",
-                    evidence_id=mapping.evidence_id,
+                    evidence_id=evidence.evidence_id,
                     status="compliant" if is_uploaded else "non_compliant",
                     has_evidence=is_uploaded,
                 ))
@@ -248,15 +250,16 @@ class ScoreService:
             # Get uploaded evidence IDs
             uploaded_evidence_ids = [ev.evidence_id for ev in response.evidence if ev.evidence_id]
 
-            # Build specifications status
+            # Build specifications status from acceptance_evidence with specification_code
             spec_status = []
-            if maturity_level and maturity_level.evidence_mappings:
-                for m in maturity_level.evidence_mappings:
-                    spec_status.append({
-                        "code": m.specification_code,
-                        "evidence_id": m.evidence_id,
-                        "uploaded": m.evidence_id in uploaded_evidence_ids,
-                    })
+            if maturity_level and maturity_level.acceptance_evidence:
+                for ev in maturity_level.acceptance_evidence:
+                    if ev.specification_code:
+                        spec_status.append({
+                            "code": ev.specification_code,
+                            "evidence_id": ev.evidence_id,
+                            "uploaded": ev.evidence_id in uploaded_evidence_ids,
+                        })
 
             required_evidence_count = len(maturity_level.acceptance_evidence) if maturity_level else 0
 

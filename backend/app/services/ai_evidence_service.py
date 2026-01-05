@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.models.assessment import AssessmentResponse
 from app.models.ndi import NDIQuestion, NDIMaturityLevel, NDIAcceptanceEvidence
 from app.models.evidence import Evidence
-from app.config import settings
+from app.services.ai_service import get_active_ai_provider
 
 
 class AIEvidenceService:
@@ -18,7 +18,13 @@ class AIEvidenceService:
 
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.has_ai = bool(settings.google_api_key or settings.openai_api_key)
+        self._ai_provider = None  # Will be loaded from database
+
+    async def _get_ai_provider(self) -> Optional[Dict]:
+        """Get AI provider from database (cached)."""
+        if self._ai_provider is None:
+            self._ai_provider = await get_active_ai_provider(self.db)
+        return self._ai_provider
 
     async def analyze_evidence(
         self,
@@ -27,10 +33,11 @@ class AIEvidenceService:
     ) -> Dict[str, Any]:
         """تحليل الشواهد المرفقة لإجابة محددة."""
 
-        if not self.has_ai:
+        ai_provider = await self._get_ai_provider()
+        if not ai_provider or not ai_provider.get("api_key"):
             return {
                 "status": "error",
-                "message": "AI not configured. Please set GOOGLE_API_KEY or OPENAI_API_KEY",
+                "message": "AI not configured. Please configure AI providers in Settings.",
             }
 
         # Get response with evidence
@@ -182,10 +189,11 @@ class AIEvidenceService:
     ) -> Dict[str, Any]:
         """اقتراح هيكل الدليل المطلوب."""
 
-        if not self.has_ai:
+        ai_provider = await self._get_ai_provider()
+        if not ai_provider or not ai_provider.get("api_key"):
             return {
                 "status": "error",
-                "message": "AI not configured",
+                "message": "AI not configured. Please configure AI providers in Settings.",
             }
 
         # Get question and maturity level
@@ -364,21 +372,54 @@ class AIEvidenceService:
         return recommendations
 
     async def _call_llm(self, prompt: str) -> str:
-        """Call the configured LLM."""
-        if settings.google_api_key:
+        """Call the configured LLM from database settings."""
+        ai_provider = await self._get_ai_provider()
+
+        if not ai_provider or not ai_provider.get("api_key"):
+            raise ValueError("No AI provider configured. Please configure in Settings.")
+
+        provider_id = ai_provider.get("id", "")
+        api_key = ai_provider.get("api_key", "")
+        model_name = ai_provider.get("model_name", "")
+        api_endpoint = ai_provider.get("api_endpoint", "")
+
+        if provider_id == "gemini":
             import google.generativeai as genai
-            genai.configure(api_key=settings.google_api_key)
-            model = genai.GenerativeModel("gemini-pro")
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel(model_name or "gemini-pro")
             response = model.generate_content(prompt)
             return response.text
 
-        elif settings.openai_api_key:
+        elif provider_id == "openai":
             from openai import AsyncOpenAI
-            client = AsyncOpenAI(api_key=settings.openai_api_key)
+            client = AsyncOpenAI(api_key=api_key)
             response = await client.chat.completions.create(
-                model="gpt-4",
+                model=model_name or "gpt-4",
                 messages=[{"role": "user", "content": prompt}],
             )
             return response.choices[0].message.content
 
-        raise ValueError("No AI provider configured")
+        elif provider_id == "claude":
+            import anthropic
+            client = anthropic.AsyncAnthropic(api_key=api_key)
+            response = await client.messages.create(
+                model=model_name or "claude-3-opus-20240229",
+                max_tokens=2048,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return response.content[0].text
+
+        elif provider_id == "azure":
+            from openai import AsyncAzureOpenAI
+            client = AsyncAzureOpenAI(
+                api_key=api_key,
+                api_version="2024-02-15-preview",
+                azure_endpoint=api_endpoint,
+            )
+            response = await client.chat.completions.create(
+                model=model_name or "gpt-4",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return response.choices[0].message.content
+
+        raise ValueError(f"Unknown AI provider: {provider_id}")

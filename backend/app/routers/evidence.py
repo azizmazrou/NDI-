@@ -1,5 +1,6 @@
 """Evidence router."""
 import os
+import re
 import uuid as uuid_lib
 from pathlib import Path
 from typing import Optional
@@ -7,14 +8,28 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
 from app.models.evidence import Evidence
-from app.models.assessment import AssessmentResponse
+from app.models.assessment import AssessmentResponse, Assessment
+from app.models.ndi import NDIQuestion
 from app.schemas.evidence import EvidenceResponse, EvidenceAnalysis
 from app.services.evidence_service import EvidenceService
+
+
+def sanitize_folder_name(name: str) -> str:
+    """Sanitize folder name to be filesystem-safe."""
+    if not name:
+        return "unnamed"
+    # Replace spaces and special chars with underscores
+    name = re.sub(r'[^\w\-_]', '_', name)
+    # Remove consecutive underscores
+    name = re.sub(r'_+', '_', name)
+    # Limit length
+    return name[:50].strip('_')
 
 router = APIRouter()
 
@@ -29,11 +44,17 @@ async def upload_evidence(
     db: AsyncSession = Depends(get_db),
 ):
     """Upload evidence file."""
-    # Verify response exists
+    # Verify response exists and get related data for folder structure
     result = await db.execute(
-        select(AssessmentResponse).where(AssessmentResponse.id == response_id)
+        select(AssessmentResponse)
+        .options(
+            selectinload(AssessmentResponse.assessment),
+            selectinload(AssessmentResponse.question).selectinload(NDIQuestion.domain)
+        )
+        .where(AssessmentResponse.id == response_id)
     )
-    if not result.scalar_one_or_none():
+    assessment_response = result.scalar_one_or_none()
+    if not assessment_response:
         raise HTTPException(status_code=404, detail="Assessment response not found")
 
     # Validate file
@@ -55,13 +76,24 @@ async def upload_evidence(
             detail=f"File too large. Maximum size: {settings.max_upload_size / (1024 * 1024)}MB",
         )
 
-    # Create upload directory
-    upload_dir = Path(settings.upload_dir) / str(response_id)
+    # Build folder structure: storage/{assessment_name}/{domain_code}/level_{level}/
+    assessment_name = sanitize_folder_name(
+        assessment_response.assessment.name or f"assessment_{assessment_response.assessment_id}"
+    )
+    domain_code = (
+        assessment_response.question.domain.code
+        if assessment_response.question and assessment_response.question.domain
+        else "unknown"
+    )
+    level = assessment_response.selected_level or 0
+
+    upload_dir = Path(settings.upload_dir) / assessment_name / domain_code / f"level_{level}"
     upload_dir.mkdir(parents=True, exist_ok=True)
 
-    # Generate unique filename
+    # Generate unique filename preserving original name
     file_uuid = uuid_lib.uuid4()
-    file_path = upload_dir / f"{file_uuid}{file_ext}"
+    safe_filename = sanitize_folder_name(Path(file.filename).stem)
+    file_path = upload_dir / f"{safe_filename}_{file_uuid}{file_ext}"
 
     # Save file
     with open(file_path, "wb") as f:

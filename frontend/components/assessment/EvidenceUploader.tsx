@@ -34,6 +34,7 @@ interface EvidenceUploaderProps {
   onUpload: (file: File) => Promise<{ id: string }>;
   onAnalyze: (evidenceId: string) => Promise<any>;
   existingFiles?: UploadedFile[];
+  disabled?: boolean;
 }
 
 export function EvidenceUploader({
@@ -41,6 +42,7 @@ export function EvidenceUploader({
   onUpload,
   onAnalyze,
   existingFiles = [],
+  disabled = false,
 }: EvidenceUploaderProps) {
   const t = useTranslations();
   const locale = useLocale();
@@ -94,6 +96,7 @@ export function EvidenceUploader({
     onDrop,
     accept: ACCEPTED_FILE_TYPES,
     maxSize: MAX_FILE_SIZE,
+    disabled,
   });
 
   const handleAnalyze = async (fileId: string) => {
@@ -135,10 +138,13 @@ export function EvidenceUploader({
       <div
         {...getRootProps()}
         className={cn(
-          "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors",
-          isDragActive
+          "border-2 border-dashed rounded-lg p-6 text-center transition-colors",
+          disabled
+            ? "cursor-not-allowed opacity-50 border-muted"
+            : "cursor-pointer",
+          !disabled && isDragActive
             ? "border-primary bg-primary/5"
-            : "border-muted-foreground/25 hover:border-muted-foreground/50"
+            : !disabled && "border-muted-foreground/25 hover:border-muted-foreground/50"
         )}
       >
         <input {...getInputProps()} />

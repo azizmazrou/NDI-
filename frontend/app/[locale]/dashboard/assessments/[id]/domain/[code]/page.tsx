@@ -29,6 +29,8 @@ export default function DomainQuestionsPage({
   const [savedQuestions, setSavedQuestions] = useState<Set<string>>(new Set());
   const [responseIds, setResponseIds] = useState<Record<string, string>>({});
   const [uploadedEvidence, setUploadedEvidence] = useState<Record<string, any[]>>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
   // Fetch assessment
   const fetchAssessment = useCallback(() => assessmentsApi.get(params.id), [params.id]);
@@ -82,21 +84,35 @@ export default function DomainQuestionsPage({
 
   const handleSaveResponse = async (questionCode: string, questionId: string) => {
     const response = responses[questionCode];
-    if (response?.level === null || response?.level === undefined) return;
+    if (response?.level === null || response?.level === undefined) {
+      setSaveError(locale === "ar" ? "يرجى اختيار مستوى النضج أولاً" : "Please select a maturity level first");
+      return;
+    }
+
+    setSaveError(null);
+    setSaveSuccess(null);
 
     try {
+      console.log("Saving response:", { question_id: questionId, selected_level: response.level });
       const savedResponse = await saveMutation.mutate({
         question_id: questionId,
         selected_level: response.level,
         justification: response.justification,
       });
+      console.log("Save response result:", savedResponse);
+
       // Store the response ID for evidence uploads
       if (savedResponse?.id) {
         setResponseIds((prev) => ({ ...prev, [questionCode]: savedResponse.id }));
+        setSaveSuccess(locale === "ar" ? "تم حفظ الإجابة بنجاح" : "Response saved successfully");
+        setSavedQuestions((prev) => new Set([...Array.from(prev), questionCode]));
+      } else {
+        setSaveError(locale === "ar" ? "لم يتم إرجاع معرف الإجابة" : "Response ID not returned from server");
+        console.error("savedResponse missing id:", savedResponse);
       }
-      setSavedQuestions((prev) => new Set([...Array.from(prev), questionCode]));
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to save response:", err);
+      setSaveError(err?.message || (locale === "ar" ? "فشل في حفظ الإجابة" : "Failed to save response"));
     }
   };
 
@@ -327,6 +343,18 @@ export default function DomainQuestionsPage({
                 disabled={!responseIds[currentQuestion.code]}
               />
             </div>
+
+            {/* Save Error/Success Messages */}
+            {saveError && (
+              <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">
+                {saveError}
+              </div>
+            )}
+            {saveSuccess && (
+              <div className="text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">
+                {saveSuccess}
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex items-center justify-between pt-4 border-t">

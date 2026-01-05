@@ -1,7 +1,7 @@
 """Evidence service for document processing and analysis."""
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -11,8 +11,19 @@ from sqlalchemy.orm import selectinload
 from app.models.evidence import Evidence
 from app.models.assessment import AssessmentResponse
 from app.models.ndi import NDIQuestion, NDIMaturityLevel
+from app.models.settings import SystemPrompt
 from app.schemas.evidence import EvidenceAnalysis
 from app.config import settings
+from app.services.ai_service import get_active_ai_provider
+
+
+async def get_system_prompt(db, prompt_id: str) -> Optional[str]:
+    """Get a system prompt template from the database."""
+    result = await db.execute(
+        select(SystemPrompt).where(SystemPrompt.id == prompt_id).where(SystemPrompt.is_active == True)
+    )
+    prompt = result.scalar_one_or_none()
+    return prompt.prompt_template if prompt else None
 
 
 class EvidenceService:
@@ -270,9 +281,11 @@ class EvidenceService:
         level_description: str,
         acceptance_criteria: list[str],
     ) -> dict:
-        """Perform AI analysis of document."""
-        # Check if AI is configured
-        if not settings.google_api_key and not settings.openai_api_key:
+        """Perform AI analysis of document using database-configured provider."""
+        # Get AI provider from database
+        ai_provider = await get_active_ai_provider(self.db)
+
+        if not ai_provider or not ai_provider.get("api_key"):
             # Return mock analysis if no AI configured
             return {
                 "supports_level": "partial",
@@ -280,24 +293,17 @@ class EvidenceService:
                 "missing_criteria": acceptance_criteria[len(acceptance_criteria)//2:] if acceptance_criteria else [],
                 "confidence_score": 0.5,
                 "recommendations": [
-                    "Configure AI API keys for detailed analysis",
+                    "Configure AI providers in Settings for detailed analysis",
                     "Review document manually against criteria",
                 ],
-                "summary_ar": "تحليل أولي - يرجى تكوين مفاتيح API للذكاء الاصطناعي للتحليل التفصيلي",
-                "summary_en": "Preliminary analysis - Please configure AI API keys for detailed analysis",
+                "summary_ar": "تحليل أولي - يرجى تكوين مزود الذكاء الاصطناعي في الإعدادات للتحليل التفصيلي",
+                "summary_en": "Preliminary analysis - Please configure AI provider in Settings for detailed analysis",
             }
 
         try:
-            # Use Google Gemini if available
-            if settings.google_api_key:
-                return await self._analyze_with_gemini(
-                    document_text, question, level_description, acceptance_criteria
-                )
-            # Use OpenAI if available
-            elif settings.openai_api_key:
-                return await self._analyze_with_openai(
-                    document_text, question, level_description, acceptance_criteria
-                )
+            return await self._analyze_with_provider(
+                ai_provider, document_text, question, level_description, acceptance_criteria
+            )
         except Exception as e:
             print(f"AI analysis error: {e}")
             return {
@@ -308,29 +314,36 @@ class EvidenceService:
                 "recommendations": [f"Analysis failed: {str(e)}"],
             }
 
-        return {
-            "supports_level": "no",
-            "covered_criteria": [],
-            "missing_criteria": acceptance_criteria,
-            "confidence_score": 0.0,
-            "recommendations": ["No AI provider configured"],
-        }
-
-    async def _analyze_with_gemini(
+    async def _analyze_with_provider(
         self,
+        ai_provider: Dict[str, Any],
         document_text: str,
         question: str,
         level_description: str,
         acceptance_criteria: list[str],
     ) -> dict:
-        """Analyze using Google Gemini."""
-        import google.generativeai as genai
+        """Analyze using the configured AI provider."""
+        import json
 
-        genai.configure(api_key=settings.google_api_key)
-        model = genai.GenerativeModel("gemini-pro")
+        provider_id = ai_provider.get("id", "")
+        api_key = ai_provider.get("api_key", "")
+        model_name = ai_provider.get("model_name", "")
+        api_endpoint = ai_provider.get("api_endpoint", "")
 
         criteria_text = "\n".join(f"- {c}" for c in acceptance_criteria)
-        prompt = f"""أنت محلل شواهد لمؤشر البيانات الوطني (NDI).
+
+        # Try to get prompt from database, fallback to default
+        prompt_template = await get_system_prompt(self.db, "evidence_analysis")
+        if prompt_template:
+            prompt = prompt_template.format(
+                question=question,
+                level_description=level_description,
+                criteria_text=criteria_text,
+                document_text=document_text[:8000]
+            )
+        else:
+            # Fallback default prompt
+            prompt = f"""أنت محلل شواهد لمؤشر البيانات الوطني (NDI).
 
 السؤال: {question}
 وصف المستوى: {level_description}
@@ -358,18 +371,57 @@ class EvidenceService:
 }}
 """
 
-        response = model.generate_content(prompt)
+        response_text = ""
+
+        if provider_id == "gemini":
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel(model_name or "gemini-pro")
+            response = model.generate_content(prompt)
+            response_text = response.text
+
+        elif provider_id == "openai":
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=api_key)
+            response = await client.chat.completions.create(
+                model=model_name or "gpt-4",
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+            )
+            response_text = response.choices[0].message.content
+
+        elif provider_id == "claude":
+            import anthropic
+            client = anthropic.AsyncAnthropic(api_key=api_key)
+            response = await client.messages.create(
+                model=model_name or "claude-3-opus-20240229",
+                max_tokens=2048,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            response_text = response.content[0].text
+
+        elif provider_id == "azure":
+            from openai import AsyncAzureOpenAI
+            client = AsyncAzureOpenAI(
+                api_key=api_key,
+                api_version="2024-02-15-preview",
+                azure_endpoint=api_endpoint,
+            )
+            response = await client.chat.completions.create(
+                model=model_name or "gpt-4",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            response_text = response.choices[0].message.content
+        else:
+            raise ValueError(f"Unknown AI provider: {provider_id}")
 
         # Parse JSON response
-        import json
         try:
-            # Extract JSON from response
-            text = response.text
             # Find JSON in response
-            start = text.find("{")
-            end = text.rfind("}") + 1
+            start = response_text.find("{")
+            end = response_text.rfind("}") + 1
             if start >= 0 and end > start:
-                return json.loads(text[start:end])
+                return json.loads(response_text[start:end])
         except json.JSONDecodeError:
             pass
 
@@ -380,47 +432,3 @@ class EvidenceService:
             "confidence_score": 0.5,
             "recommendations": ["Could not parse AI response"],
         }
-
-    async def _analyze_with_openai(
-        self,
-        document_text: str,
-        question: str,
-        level_description: str,
-        acceptance_criteria: list[str],
-    ) -> dict:
-        """Analyze using OpenAI."""
-        from openai import AsyncOpenAI
-
-        client = AsyncOpenAI(api_key=settings.openai_api_key)
-
-        criteria_text = "\n".join(f"- {c}" for c in acceptance_criteria)
-        prompt = f"""You are an evidence analyzer for the National Data Index (NDI).
-
-Question: {question}
-Level Description: {level_description}
-Acceptance Criteria:
-{criteria_text}
-
-Document Content:
-{document_text[:8000]}
-
-Analyze and respond with JSON only:
-{{
-  "supports_level": "yes|partial|no",
-  "covered_criteria": [],
-  "missing_criteria": [],
-  "confidence_score": 0.0-1.0,
-  "recommendations": [],
-  "summary_ar": "",
-  "summary_en": ""
-}}
-"""
-
-        response = await client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-        )
-
-        import json
-        return json.loads(response.choices[0].message.content)

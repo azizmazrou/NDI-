@@ -11,7 +11,7 @@ import os
 
 from app.models.assessment import Assessment, AssessmentResponse as AssessmentResponseModel
 from app.models.ndi import NDIDomain, NDIQuestion
-from app.models.settings import AIProviderConfig
+from app.models.settings import AIProviderConfig, SystemPrompt
 from app.schemas.ai import (
     GapAnalysisResponse,
     GapItem,
@@ -324,7 +324,20 @@ class AIService:
         model_name = ai_provider.get("model_name", "")
         api_endpoint = ai_provider.get("api_endpoint", "")
 
-        system_prompt = f"""You are an expert assistant for the National Data Index (NDI) compliance system.
+        # Try to get prompt from database
+        prompt_result = await self.db.execute(
+            select(SystemPrompt).where(SystemPrompt.id == "chat_assistant").where(SystemPrompt.is_active == True)
+        )
+        prompt_record = prompt_result.scalar_one_or_none()
+
+        if prompt_record:
+            system_prompt = prompt_record.prompt_template.format(
+                context_text=context_text,
+                language='Arabic' if language == 'ar' else 'English'
+            )
+        else:
+            # Fallback default prompt
+            system_prompt = f"""You are an expert assistant for the National Data Index (NDI) compliance system.
 Available context:
 {context_text}
 

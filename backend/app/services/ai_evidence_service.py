@@ -10,7 +10,17 @@ from sqlalchemy.orm import selectinload
 from app.models.assessment import AssessmentResponse
 from app.models.ndi import NDIQuestion, NDIMaturityLevel, NDIAcceptanceEvidence
 from app.models.evidence import Evidence
+from app.models.settings import SystemPrompt
 from app.services.ai_service import get_active_ai_provider
+
+
+async def get_system_prompt(db, prompt_id: str) -> Optional[str]:
+    """Get a system prompt template from the database."""
+    result = await db.execute(
+        select(SystemPrompt).where(SystemPrompt.id == prompt_id).where(SystemPrompt.is_active == True)
+    )
+    prompt = result.scalar_one_or_none()
+    return prompt.prompt_template if prompt else None
 
 
 class AIEvidenceService:
@@ -134,7 +144,16 @@ class AIEvidenceService:
         # Get evidence content
         evidence_content = evidence.extracted_text or evidence.file_name
 
-        prompt = f"""
+        # Try to get prompt from database
+        prompt_template = await get_system_prompt(self.db, "single_evidence_check")
+        if prompt_template:
+            prompt = prompt_template.format(
+                criteria_text=criteria_text,
+                evidence_content=evidence_content[:3000] if evidence_content else 'لا يوجد نص مستخرج'
+            )
+        else:
+            # Fallback default prompt
+            prompt = f"""
 أنت محلل شواهد لمؤشر البيانات الوطني (NDI).
 
 معايير القبول المطلوبة:
@@ -228,16 +247,30 @@ class AIEvidenceService:
 
         level_description = maturity_level.description_ar if language == "ar" else maturity_level.description_en
         question_text = question.question_ar if language == "ar" else question.question_en
+        level_name = maturity_level.name_ar if language == "ar" else maturity_level.name_en
+        acceptance_criteria_text = chr(10).join(f'- {c}' for c in acceptance_criteria)
 
-        prompt = f"""
+        # Try to get prompt from database
+        prompt_template = await get_system_prompt(self.db, "evidence_structure")
+        if prompt_template:
+            prompt = prompt_template.format(
+                question_text=question_text,
+                target_level=target_level,
+                level_name=level_name,
+                level_description=level_description,
+                acceptance_criteria=acceptance_criteria_text
+            )
+        else:
+            # Fallback default prompt
+            prompt = f"""
 أنت مستشار في مؤشر البيانات الوطني (NDI).
 
 السؤال: {question_text}
-المستوى المستهدف: {target_level} - {maturity_level.name_ar if language == "ar" else maturity_level.name_en}
+المستوى المستهدف: {target_level} - {level_name}
 وصف المستوى: {level_description}
 
 معايير القبول / الشواهد المطلوبة:
-{chr(10).join(f'- {c}' for c in acceptance_criteria)}
+{acceptance_criteria_text}
 
 المطلوب:
 اقترح هيكلاً للدليل المطلوب يتضمن:

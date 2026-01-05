@@ -92,6 +92,19 @@ export interface AIProvider {
 }
 
 // Organization Settings (single organization)
+// System Prompt types
+export interface SystemPrompt {
+  id: string;
+  name_en: string;
+  name_ar: string;
+  description_en: string | null;
+  description_ar: string | null;
+  prompt_template: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export const settingsApi = {
   get: () => fetchApi<OrganizationSettings>("/settings/organization"),
 
@@ -134,6 +147,21 @@ export const settingsApi = {
         body: JSON.stringify({ provider_id: providerId, api_key: apiKey }),
       }
     ),
+
+  // System Prompts
+  getSystemPrompts: () =>
+    fetchApi<{ prompts: SystemPrompt[] }>("/settings/system-prompts"),
+
+  updateSystemPrompt: (promptId: string, data: { prompt_template?: string; is_active?: boolean }) =>
+    fetchApi<SystemPrompt>(`/settings/system-prompts/${promptId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  resetSystemPrompts: () =>
+    fetchApi<{ success: boolean; message: string; count: number }>("/settings/system-prompts/reset", {
+      method: "POST",
+    }),
 };
 
 // NDI Data

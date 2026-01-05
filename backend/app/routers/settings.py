@@ -12,7 +12,7 @@ from cryptography.fernet import Fernet
 import os
 
 from app.database import get_db
-from app.models.settings import Setting, AIProviderConfig, SettingCategory, OrganizationSettings
+from app.models.settings import Setting, AIProviderConfig, SettingCategory, OrganizationSettings, SystemPrompt
 from app.schemas.settings import (
     SettingResponse,
     SettingCreate,
@@ -26,6 +26,9 @@ from app.schemas.settings import (
     TestConnectionResponse,
     OrganizationSettingsResponse,
     OrganizationSettingsUpdate,
+    SystemPromptResponse,
+    SystemPromptUpdate,
+    SystemPromptListResponse,
 )
 
 router = APIRouter(tags=["Settings - الإعدادات"])
@@ -565,3 +568,258 @@ async def fetch_provider_models(
 
     except Exception as e:
         return {"models": [], "error": str(e)}
+
+
+# =============================================================================
+# System Prompts Endpoints
+# =============================================================================
+
+@router.get("/system-prompts", response_model=SystemPromptListResponse)
+async def get_system_prompts(db: AsyncSession = Depends(get_db)):
+    """
+    Get all system prompts
+    الحصول على جميع نصوص الأوامر النظامية
+    """
+    result = await db.execute(select(SystemPrompt))
+    prompts = result.scalars().all()
+
+    # If no prompts exist, create defaults
+    if not prompts:
+        prompts = await create_default_prompts(db)
+
+    return SystemPromptListResponse(
+        prompts=[
+            SystemPromptResponse(
+                id=p.id,
+                name_en=p.name_en,
+                name_ar=p.name_ar,
+                description_en=p.description_en,
+                description_ar=p.description_ar,
+                prompt_template=p.prompt_template,
+                is_active=p.is_active,
+                created_at=p.created_at,
+                updated_at=p.updated_at,
+            )
+            for p in prompts
+        ]
+    )
+
+
+@router.get("/system-prompts/{prompt_id}", response_model=SystemPromptResponse)
+async def get_system_prompt(prompt_id: str, db: AsyncSession = Depends(get_db)):
+    """
+    Get a specific system prompt
+    الحصول على نص أوامر نظامية محدد
+    """
+    result = await db.execute(
+        select(SystemPrompt).where(SystemPrompt.id == prompt_id)
+    )
+    prompt = result.scalar_one_or_none()
+
+    if not prompt:
+        raise HTTPException(status_code=404, detail="System prompt not found")
+
+    return SystemPromptResponse(
+        id=prompt.id,
+        name_en=prompt.name_en,
+        name_ar=prompt.name_ar,
+        description_en=prompt.description_en,
+        description_ar=prompt.description_ar,
+        prompt_template=prompt.prompt_template,
+        is_active=prompt.is_active,
+        created_at=prompt.created_at,
+        updated_at=prompt.updated_at,
+    )
+
+
+@router.put("/system-prompts/{prompt_id}", response_model=SystemPromptResponse)
+async def update_system_prompt(
+    prompt_id: str,
+    prompt_update: SystemPromptUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update a system prompt
+    تحديث نص أوامر نظامية
+    """
+    result = await db.execute(
+        select(SystemPrompt).where(SystemPrompt.id == prompt_id)
+    )
+    prompt = result.scalar_one_or_none()
+
+    if not prompt:
+        raise HTTPException(status_code=404, detail="System prompt not found")
+
+    update_data = prompt_update.model_dump(exclude_unset=True)
+
+    for key, value in update_data.items():
+        setattr(prompt, key, value)
+
+    await db.commit()
+    await db.refresh(prompt)
+
+    return SystemPromptResponse(
+        id=prompt.id,
+        name_en=prompt.name_en,
+        name_ar=prompt.name_ar,
+        description_en=prompt.description_en,
+        description_ar=prompt.description_ar,
+        prompt_template=prompt.prompt_template,
+        is_active=prompt.is_active,
+        created_at=prompt.created_at,
+        updated_at=prompt.updated_at,
+    )
+
+
+@router.post("/system-prompts/reset")
+async def reset_system_prompts(db: AsyncSession = Depends(get_db)):
+    """
+    Reset all system prompts to defaults
+    إعادة تعيين جميع نصوص الأوامر النظامية إلى الافتراضية
+    """
+    # Delete existing prompts
+    await db.execute(select(SystemPrompt))  # Just to ensure table exists
+    from sqlalchemy import delete
+    await db.execute(delete(SystemPrompt))
+    await db.commit()
+
+    # Create defaults
+    prompts = await create_default_prompts(db)
+
+    return {
+        "success": True,
+        "message": "System prompts reset to defaults",
+        "count": len(prompts)
+    }
+
+
+async def create_default_prompts(db: AsyncSession) -> List[SystemPrompt]:
+    """Create default system prompts"""
+    default_prompts = [
+        SystemPrompt(
+            id="evidence_analysis",
+            name_en="Evidence Analysis",
+            name_ar="تحليل الشواهد",
+            description_en="Prompt used for analyzing evidence documents against NDI criteria",
+            description_ar="النص المستخدم لتحليل مستندات الشواهد مقابل معايير المؤشر",
+            prompt_template="""أنت محلل شواهد لمؤشر البيانات الوطني (NDI).
+
+السؤال: {question}
+وصف المستوى: {level_description}
+معايير القبول:
+{criteria_text}
+
+المستند المرفوع:
+{document_text}
+
+المطلوب:
+1. هل المستند يدعم المستوى المختار؟ (yes/partial/no)
+2. أي معايير قبول يغطيها المستند؟
+3. أي معايير قبول مفقودة؟
+4. توصيات لتحسين الشواهد
+
+أجب بـ JSON فقط بدون أي نص إضافي:
+{{
+  "supports_level": "yes|partial|no",
+  "covered_criteria": [],
+  "missing_criteria": [],
+  "confidence_score": 0.0-1.0,
+  "recommendations": [],
+  "summary_ar": "",
+  "summary_en": ""
+}}""",
+            is_active=True,
+        ),
+        SystemPrompt(
+            id="evidence_structure",
+            name_en="Evidence Structure Suggestion",
+            name_ar="اقتراح هيكل الدليل",
+            description_en="Prompt used for suggesting evidence document structure",
+            description_ar="النص المستخدم لاقتراح هيكل مستند الدليل",
+            prompt_template="""أنت مستشار في مؤشر البيانات الوطني (NDI).
+
+السؤال: {question_text}
+المستوى المستهدف: {target_level} - {level_name}
+وصف المستوى: {level_description}
+
+معايير القبول / الشواهد المطلوبة:
+{acceptance_criteria}
+
+المطلوب:
+اقترح هيكلاً للدليل المطلوب يتضمن:
+1. عنوان الدليل المقترح
+2. الأقسام الرئيسية
+3. ما يجب أن يتضمنه كل قسم
+4. نصائح لكتابة دليل قوي
+
+أجب بصيغة JSON:
+{{
+  "title": "عنوان الدليل المقترح",
+  "sections": [
+    {{
+      "heading": "عنوان القسم",
+      "description": "ما يجب أن يتضمنه",
+      "tips": ["نصيحة 1", "نصيحة 2"]
+    }}
+  ],
+  "general_tips": ["نصيحة عامة 1", "نصيحة عامة 2"],
+  "common_mistakes": ["خطأ شائع يجب تجنبه"]
+}}""",
+            is_active=True,
+        ),
+        SystemPrompt(
+            id="chat_assistant",
+            name_en="Chat Assistant",
+            name_ar="مساعد المحادثة",
+            description_en="System prompt for the NDI chat assistant",
+            description_ar="النص النظامي لمساعد محادثة المؤشر",
+            prompt_template="""You are an expert assistant for the National Data Index (NDI) compliance system.
+
+Available context:
+{context_text}
+
+Answer in {language} concisely and helpfully. Focus on:
+- NDI maturity levels and requirements
+- Best practices for achieving compliance
+- Evidence and documentation guidance
+- Gap analysis and improvement recommendations""",
+            is_active=True,
+        ),
+        SystemPrompt(
+            id="single_evidence_check",
+            name_en="Single Evidence Check",
+            name_ar="فحص دليل واحد",
+            description_en="Prompt for checking a single evidence file against criteria",
+            description_ar="النص المستخدم لفحص ملف دليل واحد مقابل المعايير",
+            prompt_template="""أنت محلل شواهد لمؤشر البيانات الوطني (NDI).
+
+معايير القبول المطلوبة:
+{criteria_text}
+
+محتوى المستند:
+{evidence_content}
+
+المطلوب:
+1. هل المستند يغطي أياً من معايير القبول؟
+2. أي معايير مغطاة (ذكر أرقام المعايير)؟
+3. درجة التطابق (0-100%)
+
+أجب بصيغة JSON فقط:
+{{
+  "covers_any_criteria": true/false,
+  "covered_criteria_ids": [1, 2, ...],
+  "match_percentage": 0-100,
+  "summary": "ملخص قصير"
+}}""",
+            is_active=True,
+        ),
+    ]
+
+    for prompt in default_prompts:
+        db.add(prompt)
+
+    await db.commit()
+
+    # Refresh to get created_at/updated_at
+    result = await db.execute(select(SystemPrompt))
+    return result.scalars().all()

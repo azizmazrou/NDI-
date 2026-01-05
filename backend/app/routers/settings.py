@@ -12,7 +12,7 @@ from cryptography.fernet import Fernet
 import os
 
 from app.database import get_db
-from app.models.settings import Setting, AIProviderConfig, SettingCategory
+from app.models.settings import Setting, AIProviderConfig, SettingCategory, OrganizationSettings
 from app.schemas.settings import (
     SettingResponse,
     SettingCreate,
@@ -24,9 +24,11 @@ from app.schemas.settings import (
     SettingsPageResponse,
     TestConnectionRequest,
     TestConnectionResponse,
+    OrganizationSettingsResponse,
+    OrganizationSettingsUpdate,
 )
 
-router = APIRouter(prefix="/settings", tags=["Settings - الإعدادات"])
+router = APIRouter(tags=["Settings - الإعدادات"])
 
 # Encryption key - in production, this should be from a secure source
 ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", Fernet.generate_key().decode())
@@ -51,6 +53,103 @@ def mask_api_key(key: str) -> str:
     if not key or len(key) < 8:
         return "****"
     return f"{key[:4]}...{key[-4:]}"
+
+
+# =============================================================================
+# Organization Settings Endpoints
+# =============================================================================
+
+@router.get("/organization", response_model=OrganizationSettingsResponse)
+async def get_organization_settings(db: AsyncSession = Depends(get_db)):
+    """
+    Get organization settings
+    الحصول على إعدادات المنظمة
+    """
+    result = await db.execute(select(OrganizationSettings).where(OrganizationSettings.id == 1))
+    org = result.scalar_one_or_none()
+
+    if not org:
+        # Create default organization settings
+        org = OrganizationSettings(
+            id=1,
+            name_en="Organization",
+            name_ar="المنظمة",
+        )
+        db.add(org)
+        await db.commit()
+        await db.refresh(org)
+
+    return OrganizationSettingsResponse(
+        id=org.id,
+        name_en=org.name_en,
+        name_ar=org.name_ar,
+        sector=org.sector_en,
+        sector_en=org.sector_en,
+        sector_ar=org.sector_ar,
+        description_en=org.description_en,
+        description_ar=org.description_ar,
+        logo_url=org.logo_url,
+        website=org.website,
+        address=org.address_en,
+        address_en=org.address_en,
+        address_ar=org.address_ar,
+        contact_email=org.contact_email,
+        contact_phone=org.contact_phone,
+        created_at=org.created_at,
+        updated_at=org.updated_at,
+    )
+
+
+@router.put("/organization", response_model=OrganizationSettingsResponse)
+async def update_organization_settings(
+    data: OrganizationSettingsUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update organization settings
+    تحديث إعدادات المنظمة
+    """
+    result = await db.execute(select(OrganizationSettings).where(OrganizationSettings.id == 1))
+    org = result.scalar_one_or_none()
+
+    if not org:
+        org = OrganizationSettings(id=1)
+        db.add(org)
+
+    update_data = data.model_dump(exclude_unset=True)
+
+    # Map frontend field names to backend field names
+    if "sector" in update_data:
+        update_data["sector_en"] = update_data.pop("sector")
+    if "address" in update_data:
+        update_data["address_en"] = update_data.pop("address")
+
+    for key, value in update_data.items():
+        if hasattr(org, key):
+            setattr(org, key, value)
+
+    await db.commit()
+    await db.refresh(org)
+
+    return OrganizationSettingsResponse(
+        id=org.id,
+        name_en=org.name_en,
+        name_ar=org.name_ar,
+        sector=org.sector_en,
+        sector_en=org.sector_en,
+        sector_ar=org.sector_ar,
+        description_en=org.description_en,
+        description_ar=org.description_ar,
+        logo_url=org.logo_url,
+        website=org.website,
+        address=org.address_en,
+        address_en=org.address_en,
+        address_ar=org.address_ar,
+        contact_email=org.contact_email,
+        contact_phone=org.contact_phone,
+        created_at=org.created_at,
+        updated_at=org.updated_at,
+    )
 
 
 # =============================================================================

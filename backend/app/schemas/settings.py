@@ -107,3 +107,37 @@ class TestConnectionResponse(BaseModel):
     success: bool
     message: str
     provider_id: str
+
+
+# =============================================================================
+# Organization Settings Schemas
+# =============================================================================
+
+class OrganizationSettingsBase(BaseModel):
+    name_en: Optional[str] = None
+    name_ar: Optional[str] = None
+    sector: Optional[str] = None
+    sector_en: Optional[str] = None
+    sector_ar: Optional[str] = None
+    description_en: Optional[str] = None
+    description_ar: Optional[str] = None
+    logo_url: Optional[str] = None
+    website: Optional[str] = None
+    address: Optional[str] = None
+    address_en: Optional[str] = None
+    address_ar: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+
+
+class OrganizationSettingsResponse(OrganizationSettingsBase):
+    id: int = 1
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class OrganizationSettingsUpdate(OrganizationSettingsBase):
+    pass

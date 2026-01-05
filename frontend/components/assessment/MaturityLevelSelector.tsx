@@ -1,10 +1,20 @@
 "use client";
 
 import { useTranslations, useLocale } from "next-intl";
-import { Check, ChevronDown, ChevronUp } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, FileCheck } from "lucide-react";
 import { useState } from "react";
 import { cn, getLevelColor } from "@/lib/utils";
 import { MATURITY_LEVELS } from "@/lib/constants";
+
+interface AcceptanceEvidence {
+  id: string;
+  evidence_id: number;
+  text_en: string;
+  text_ar: string;
+  inherits_from_level?: number;
+  specification_code?: string;
+  sort_order?: number;
+}
 
 interface MaturityLevel {
   level: number;
@@ -12,6 +22,8 @@ interface MaturityLevel {
   name_ar: string;
   description_en: string;
   description_ar: string;
+  acceptance_evidence?: AcceptanceEvidence[];
+  // Legacy format support
   acceptance_evidence_en?: string[];
   acceptance_evidence_ar?: string[];
 }
@@ -37,12 +49,42 @@ export function MaturityLevelSelector({
     return MATURITY_LEVELS.find((l) => l.level === level);
   };
 
+  // Get acceptance evidence text based on locale
+  const getEvidenceList = (level: MaturityLevel): string[] => {
+    // New format: array of objects with text_en/text_ar
+    if (level.acceptance_evidence && level.acceptance_evidence.length > 0) {
+      return level.acceptance_evidence.map((ev) =>
+        locale === "ar" ? ev.text_ar : ev.text_en
+      );
+    }
+    // Legacy format: arrays of strings
+    if (locale === "ar" && level.acceptance_evidence_ar) {
+      return level.acceptance_evidence_ar;
+    }
+    if (level.acceptance_evidence_en) {
+      return level.acceptance_evidence_en;
+    }
+    return [];
+  };
+
+  // Get specification codes if available
+  const getSpecCodes = (level: MaturityLevel): string[] => {
+    if (level.acceptance_evidence) {
+      return level.acceptance_evidence
+        .filter((ev) => ev.specification_code)
+        .map((ev) => ev.specification_code!);
+    }
+    return [];
+  };
+
   return (
     <div className="space-y-2">
       {levels.map((level) => {
         const levelInfo = getLevelInfo(level.level);
         const isSelected = selectedLevel === level.level;
         const isExpanded = expandedLevel === level.level;
+        const evidenceList = getEvidenceList(level);
+        const specCodes = getSpecCodes(level);
 
         return (
           <div
@@ -109,21 +151,40 @@ export function MaturityLevelSelector({
               </button>
             </div>
 
-            {/* Expanded content */}
+            {/* Expanded content - Acceptance Evidence */}
             {isExpanded && (
               <div className="px-4 pb-4 pt-0 border-t">
                 <div className="pt-4 space-y-4">
-                  {/* Acceptance criteria */}
-                  {(level.acceptance_evidence_ar?.length || level.acceptance_evidence_en?.length) && (
+                  {evidenceList.length > 0 ? (
                     <div>
-                      <h4 className="text-sm font-medium mb-2">
-                        {locale === "ar" ? "معايير القبول" : "Acceptance Criteria"}
+                      <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                        <FileCheck className="h-4 w-4 text-primary" />
+                        {locale === "ar" ? "معايير القبول (الأدلة المطلوبة)" : "Acceptance Criteria (Required Evidence)"}
                       </h4>
-                      <ul className="space-y-1">
-                        {(locale === "ar"
-                          ? level.acceptance_evidence_ar
-                          : level.acceptance_evidence_en
-                        )?.map((criteria, idx) => (
+                      <ul className="space-y-2">
+                        {level.acceptance_evidence?.map((ev, idx) => (
+                          <li
+                            key={ev.id || idx}
+                            className="text-sm text-muted-foreground flex items-start gap-2 bg-muted/50 p-2 rounded"
+                          >
+                            <span className="text-primary font-medium min-w-[24px]">{ev.evidence_id}.</span>
+                            <div className="flex-1">
+                              <span>{locale === "ar" ? ev.text_ar : ev.text_en}</span>
+                              {ev.specification_code && (
+                                <span className="ms-2 text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">
+                                  {ev.specification_code}
+                                </span>
+                              )}
+                              {ev.inherits_from_level && (
+                                <span className="ms-2 text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                                  {locale === "ar"
+                                    ? `يرث من المستوى ${ev.inherits_from_level}`
+                                    : `Inherits from L${ev.inherits_from_level}`}
+                                </span>
+                              )}
+                            </div>
+                          </li>
+                        )) || evidenceList.map((criteria, idx) => (
                           <li
                             key={idx}
                             className="text-sm text-muted-foreground flex items-start gap-2"
@@ -134,6 +195,10 @@ export function MaturityLevelSelector({
                         ))}
                       </ul>
                     </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">
+                      {locale === "ar" ? "لا توجد أدلة مطلوبة لهذا المستوى" : "No evidence required for this level"}
+                    </p>
                   )}
                 </div>
               </div>

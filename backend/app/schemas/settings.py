@@ -141,3 +141,34 @@ class OrganizationSettingsResponse(OrganizationSettingsBase):
 
 class OrganizationSettingsUpdate(OrganizationSettingsBase):
     pass
+
+
+# =============================================================================
+# System Prompt Schemas
+# =============================================================================
+
+class SystemPromptBase(BaseModel):
+    id: str = Field(..., description="Prompt ID (evidence_analysis, chat_assistant, etc.)")
+    name_en: str
+    name_ar: str
+    description_en: Optional[str] = None
+    description_ar: Optional[str] = None
+    prompt_template: str = Field(..., description="Prompt template with placeholders like {question}, {context}")
+    is_active: bool = True
+
+
+class SystemPromptResponse(SystemPromptBase):
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SystemPromptUpdate(BaseModel):
+    prompt_template: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class SystemPromptListResponse(BaseModel):
+    prompts: List[SystemPromptResponse]

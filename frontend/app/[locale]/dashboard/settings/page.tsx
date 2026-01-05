@@ -32,8 +32,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { settingsApi, type AIProvider } from "@/lib/api";
+import { settingsApi, type AIProvider, type SystemPrompt } from "@/lib/api";
 import type { OrganizationSettings } from "@/types/ndi";
+import { FileText, RotateCcw } from "lucide-react";
 
 const DEFAULT_MODELS: Record<string, string[]> = {
   openai: ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
@@ -74,16 +75,26 @@ export default function SettingsPage() {
   const [fetchedModels, setFetchedModels] = useState<Record<string, string[]>>({});
   const [fetchingModels, setFetchingModels] = useState<string | null>(null);
 
+  // System prompts state
+  const [prompts, setPrompts] = useState<SystemPrompt[]>([]);
+  const [editingPrompt, setEditingPrompt] = useState<string | null>(null);
+  const [promptEdits, setPromptEdits] = useState<Record<string, string>>({});
+  const [savingPrompt, setSavingPrompt] = useState<string | null>(null);
+  const [resettingPrompts, setResettingPrompts] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
     try {
-      const [orgData, providersResponse] = await Promise.all([
+      const [orgData, providersResponse, promptsResponse] = await Promise.all([
         settingsApi.get().catch(() => null),
         settingsApi.getAIProviders().catch(() => ({ providers: [] })),
+        settingsApi.getSystemPrompts().catch(() => ({ prompts: [] })),
       ]);
+
+      setPrompts(promptsResponse.prompts || []);
 
       if (orgData) {
         setOrgSettings(orgData);
@@ -208,6 +219,37 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSavePrompt = async (promptId: string) => {
+    setSavingPrompt(promptId);
+    try {
+      await settingsApi.updateSystemPrompt(promptId, {
+        prompt_template: promptEdits[promptId],
+      });
+      await fetchData();
+      setEditingPrompt(null);
+      setPromptEdits(prev => ({ ...prev, [promptId]: "" }));
+    } catch (error) {
+      console.error("Failed to save prompt:", error);
+    } finally {
+      setSavingPrompt(null);
+    }
+  };
+
+  const handleResetPrompts = async () => {
+    if (!confirm(locale === "ar" ? "هل أنت متأكد من إعادة جميع النصوص إلى الافتراضية؟" : "Are you sure you want to reset all prompts to defaults?")) {
+      return;
+    }
+    setResettingPrompts(true);
+    try {
+      await settingsApi.resetSystemPrompts();
+      await fetchData();
+    } catch (error) {
+      console.error("Failed to reset prompts:", error);
+    } finally {
+      setResettingPrompts(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -240,6 +282,10 @@ export default function SettingsPage() {
           <TabsTrigger value="ai" className="gap-2">
             <Bot className="h-4 w-4" />
             {locale === "ar" ? "الذكاء الاصطناعي" : "AI Providers"}
+          </TabsTrigger>
+          <TabsTrigger value="prompts" className="gap-2">
+            <FileText className="h-4 w-4" />
+            {locale === "ar" ? "نصوص الأوامر" : "System Prompts"}
           </TabsTrigger>
         </TabsList>
 
@@ -622,6 +668,126 @@ export default function SettingsPage() {
                         {locale === "ar" ? "حفظ" : "Save"}
                       </Button>
                     </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* System Prompts Tab */}
+        <TabsContent value="prompts">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    {locale === "ar" ? "نصوص الأوامر النظامية" : "System Prompts"}
+                  </CardTitle>
+                  <CardDescription>
+                    {locale === "ar"
+                      ? "تخصيص نصوص الأوامر المستخدمة في تحليل الشواهد والمحادثة"
+                      : "Customize prompts used for evidence analysis and chat"}
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetPrompts}
+                  disabled={resettingPrompts}
+                >
+                  {resettingPrompts ? (
+                    <Loader2 className="h-4 w-4 animate-spin me-2" />
+                  ) : (
+                    <RotateCcw className="h-4 w-4 me-2" />
+                  )}
+                  {locale === "ar" ? "إعادة للافتراضي" : "Reset to Defaults"}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {prompts.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  {locale === "ar" ? "لا توجد نصوص أوامر" : "No prompts available"}
+                </p>
+              ) : (
+                prompts.map((prompt) => (
+                  <div key={prompt.id} className="border rounded-lg p-4 space-y-4">
+                    {/* Prompt Header */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold">
+                          {locale === "ar" ? prompt.name_ar : prompt.name_en}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {locale === "ar" ? prompt.description_ar : prompt.description_en}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs px-2 py-1 rounded ${
+                          prompt.is_active
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-600"
+                        }`}>
+                          {prompt.is_active
+                            ? (locale === "ar" ? "نشط" : "Active")
+                            : (locale === "ar" ? "معطّل" : "Disabled")}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Prompt Template */}
+                    <div className="space-y-2">
+                      <Label>{locale === "ar" ? "نموذج النص" : "Prompt Template"}</Label>
+                      <Textarea
+                        value={editingPrompt === prompt.id
+                          ? (promptEdits[prompt.id] ?? prompt.prompt_template)
+                          : prompt.prompt_template}
+                        onChange={(e) => {
+                          if (editingPrompt !== prompt.id) {
+                            setEditingPrompt(prompt.id);
+                          }
+                          setPromptEdits(prev => ({ ...prev, [prompt.id]: e.target.value }));
+                        }}
+                        rows={8}
+                        className="font-mono text-sm"
+                        dir="ltr"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {locale === "ar"
+                          ? "استخدم {placeholders} للمتغيرات الديناميكية"
+                          : "Use {placeholders} for dynamic variables"}
+                      </p>
+                    </div>
+
+                    {/* Save Button */}
+                    {editingPrompt === prompt.id && (
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingPrompt(null);
+                            setPromptEdits(prev => ({ ...prev, [prompt.id]: "" }));
+                          }}
+                        >
+                          {locale === "ar" ? "إلغاء" : "Cancel"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleSavePrompt(prompt.id)}
+                          disabled={savingPrompt === prompt.id}
+                        >
+                          {savingPrompt === prompt.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin me-2" />
+                          ) : (
+                            <Save className="h-4 w-4 me-2" />
+                          )}
+                          {locale === "ar" ? "حفظ" : "Save"}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}

@@ -88,3 +88,24 @@ class AIProviderConfig(Base):
 
     def __repr__(self):
         return f"<AIProviderConfig {self.id}>"
+
+
+class SystemPrompt(Base):
+    """
+    System Prompts Configuration
+    إعدادات نصوص الأوامر النظامية للذكاء الاصطناعي
+    """
+    __tablename__ = "system_prompts"
+
+    id = Column(String(50), primary_key=True)  # e.g., "evidence_analysis", "chat", "evidence_structure"
+    name_en = Column(String(100), nullable=False)
+    name_ar = Column(String(100), nullable=False)
+    description_en = Column(String(500), nullable=True)
+    description_ar = Column(String(500), nullable=True)
+    prompt_template = Column(Text, nullable=False)  # The actual prompt with placeholders
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    def __repr__(self):
+        return f"<SystemPrompt {self.id}>"

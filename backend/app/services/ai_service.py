@@ -6,9 +6,12 @@ import uuid as uuid_lib
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from cryptography.fernet import Fernet
+import os
 
 from app.models.assessment import Assessment, AssessmentResponse as AssessmentResponseModel
 from app.models.ndi import NDIDomain, NDIQuestion
+from app.models.settings import AIProviderConfig
 from app.schemas.ai import (
     GapAnalysisResponse,
     GapItem,
@@ -19,6 +22,52 @@ from app.schemas.ai import (
 )
 from app.config import settings
 from app.services.rag_service import RAGService
+
+
+# Encryption key for decrypting stored API keys
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "")
+
+
+def decrypt_api_key(encrypted_key: str) -> str:
+    """Decrypt stored API key."""
+    if not encrypted_key or not ENCRYPTION_KEY:
+        return ""
+    try:
+        fernet = Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
+        return fernet.decrypt(encrypted_key.encode()).decode()
+    except Exception:
+        return ""
+
+
+async def get_active_ai_provider(db: AsyncSession) -> Optional[dict]:
+    """Get the active/default AI provider configuration from database."""
+    # First try to get the default provider
+    result = await db.execute(
+        select(AIProviderConfig)
+        .where(AIProviderConfig.is_default == True)
+        .where(AIProviderConfig.is_enabled == True)
+    )
+    provider = result.scalar_one_or_none()
+
+    # If no default, get any enabled provider
+    if not provider:
+        result = await db.execute(
+            select(AIProviderConfig)
+            .where(AIProviderConfig.is_enabled == True)
+            .where(AIProviderConfig.api_key.isnot(None))
+        )
+        provider = result.scalar_one_or_none()
+
+    if not provider or not provider.api_key:
+        return None
+
+    return {
+        "id": provider.id,
+        "name": provider.name_en,
+        "api_key": decrypt_api_key(provider.api_key),
+        "api_endpoint": provider.api_endpoint,
+        "model_name": provider.model_name,
+    }
 
 
 class AIService:
@@ -230,17 +279,20 @@ class AIService:
         # Use RAG to get relevant context
         rag_results = await self.rag_service.retrieve(user_message, language=language)
 
+        # Get AI provider from database
+        ai_provider = await get_active_ai_provider(self.db)
+
         # Build response using AI
-        if settings.google_api_key or settings.openai_api_key:
+        if ai_provider and ai_provider.get("api_key"):
             response = await self._generate_chat_response(
-                user_message, rag_results, context, language
+                user_message, rag_results, context, language, ai_provider
             )
         else:
             # Fallback response without AI
             if language == "ar":
-                response = "للحصول على إجابات مفصلة، يرجى تكوين مفاتيح API للذكاء الاصطناعي."
+                response = "للحصول على إجابات مفصلة، يرجى تكوين مفاتيح API للذكاء الاصطناعي في الإعدادات."
             else:
-                response = "For detailed answers, please configure AI API keys."
+                response = "For detailed answers, please configure AI API keys in Settings."
 
         return ChatResponse(
             message=response,
@@ -254,42 +306,82 @@ class AIService:
         rag_results: dict,
         context: Optional[dict],
         language: str,
+        ai_provider: dict,
     ) -> str:
-        """Generate chat response using AI."""
+        """Generate chat response using AI provider from database."""
         context_text = rag_results.get("context", "")
+        provider_id = ai_provider.get("id", "")
+        api_key = ai_provider.get("api_key", "")
+        model_name = ai_provider.get("model_name", "")
+        api_endpoint = ai_provider.get("api_endpoint", "")
 
-        if settings.google_api_key:
-            import google.generativeai as genai
-            genai.configure(api_key=settings.google_api_key)
-            model = genai.GenerativeModel("gemini-pro")
-
-            prompt = f"""أنت مساعد خبير في مؤشر البيانات الوطني (NDI).
-
-السياق المتاح:
+        system_prompt = f"""You are an expert assistant for the National Data Index (NDI) compliance system.
+Available context:
 {context_text}
 
-سؤال المستخدم: {question}
+Answer in {'Arabic' if language == 'ar' else 'English'} concisely and helpfully."""
 
-أجب بلغة {'العربية' if language == 'ar' else 'الإنجليزية'} بشكل مختصر ومفيد.
-"""
+        try:
+            if provider_id == "gemini":
+                import google.generativeai as genai
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel(model_name or "gemini-pro")
 
-            response = model.generate_content(prompt)
-            return response.text
+                prompt = f"""{system_prompt}
 
-        elif settings.openai_api_key:
-            from openai import AsyncOpenAI
-            client = AsyncOpenAI(api_key=settings.openai_api_key)
+User question: {question}"""
+                response = model.generate_content(prompt)
+                return response.text
 
-            response = await client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": f"You are an NDI expert assistant. Context: {context_text}",
-                    },
-                    {"role": "user", "content": question},
-                ],
-            )
-            return response.choices[0].message.content
+            elif provider_id == "openai":
+                from openai import AsyncOpenAI
+                client = AsyncOpenAI(api_key=api_key)
 
-        return "AI not configured"
+                response = await client.chat.completions.create(
+                    model=model_name or "gpt-4",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": question},
+                    ],
+                )
+                return response.choices[0].message.content
+
+            elif provider_id == "claude":
+                import anthropic
+                client = anthropic.AsyncAnthropic(api_key=api_key)
+
+                response = await client.messages.create(
+                    model=model_name or "claude-3-opus-20240229",
+                    max_tokens=1024,
+                    system=system_prompt,
+                    messages=[
+                        {"role": "user", "content": question},
+                    ],
+                )
+                return response.content[0].text
+
+            elif provider_id == "azure":
+                from openai import AsyncAzureOpenAI
+                client = AsyncAzureOpenAI(
+                    api_key=api_key,
+                    api_version="2024-02-15-preview",
+                    azure_endpoint=api_endpoint,
+                )
+
+                response = await client.chat.completions.create(
+                    model=model_name or "gpt-4",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": question},
+                    ],
+                )
+                return response.choices[0].message.content
+
+            else:
+                return "Unknown AI provider configured"
+
+        except Exception as e:
+            error_msg = str(e)
+            if language == "ar":
+                return f"حدث خطأ في معالجة الطلب: {error_msg}"
+            return f"Error processing request: {error_msg}"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import Link from "next/link";
 import { ArrowRight, ArrowLeft, Save, Loader2, CheckCircle2 } from "lucide-react";
@@ -51,7 +51,7 @@ export default function DomainQuestionsPage({
   );
 
   // Initialize responses from existing data
-  useState(() => {
+  useEffect(() => {
     if (existingResponses) {
       const initialResponses: Record<string, { level: number | null; justification: string }> = {};
       const initialResponseIds: Record<string, string> = {};
@@ -78,7 +78,7 @@ export default function DomainQuestionsPage({
       setResponseIds(initialResponseIds);
       setUploadedEvidence(initialEvidence);
     }
-  });
+  }, [existingResponses]);
 
   const handleSaveResponse = async (questionCode: string, questionId: string) => {
     const response = responses[questionCode];

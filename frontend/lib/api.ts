@@ -125,6 +125,15 @@ export const settingsApi = {
         body: JSON.stringify({ provider_id: providerId, api_key: apiKey }),
       }
     ),
+
+  fetchModels: (providerId: string, apiKey?: string) =>
+    fetchApi<{ models: string[]; error?: string; message?: string }>(
+      `/settings/ai-providers/${providerId}/fetch-models`,
+      {
+        method: "POST",
+        body: JSON.stringify({ provider_id: providerId, api_key: apiKey }),
+      }
+    ),
 };
 
 // NDI Data

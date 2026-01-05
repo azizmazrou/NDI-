@@ -17,6 +17,7 @@ import {
   Globe,
   Mail,
   Phone,
+  RefreshCw,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -70,6 +71,8 @@ export default function SettingsPage() {
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [endpoints, setEndpoints] = useState<Record<string, string>>({});
   const [models, setModels] = useState<Record<string, string>>({});
+  const [fetchedModels, setFetchedModels] = useState<Record<string, string[]>>({});
+  const [fetchingModels, setFetchingModels] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -186,6 +189,22 @@ export default function SettingsPage() {
       await fetchData();
     } catch (error) {
       console.error("Failed to toggle:", error);
+    }
+  };
+
+  const handleFetchModels = async (providerId: string) => {
+    setFetchingModels(providerId);
+    try {
+      const result = await settingsApi.fetchModels(providerId, apiKeys[providerId] || undefined);
+      if (result.models && result.models.length > 0) {
+        setFetchedModels(prev => ({ ...prev, [providerId]: result.models }));
+      } else if (result.error) {
+        console.error("Failed to fetch models:", result.error);
+      }
+    } catch (error) {
+      console.error("Failed to fetch models:", error);
+    } finally {
+      setFetchingModels(null);
     }
   };
 
@@ -490,24 +509,58 @@ export default function SettingsPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor={`${provider.id}-model`}>
-                          {locale === "ar" ? "النموذج" : "Model"}
-                        </Label>
-                        <Select
-                          value={models[provider.id] || provider.model_name || ""}
-                          onValueChange={(value) => setModels(prev => ({ ...prev, [provider.id]: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder={locale === "ar" ? "اختر النموذج" : "Select model"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {DEFAULT_MODELS[provider.id]?.map((model) => (
-                              <SelectItem key={model} value={model}>
-                                {model}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor={`${provider.id}-model`}>
+                            {locale === "ar" ? "النموذج" : "Model"}
+                            {provider.id === "azure" && (
+                              <span className="text-xs text-muted-foreground ms-2">
+                                ({locale === "ar" ? "اسم النشر" : "Deployment name"})
+                              </span>
+                            )}
+                          </Label>
+                          {provider.id !== "azure" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleFetchModels(provider.id)}
+                              disabled={fetchingModels === provider.id || (!apiKeys[provider.id] && !provider.has_api_key)}
+                              className="h-6 text-xs"
+                            >
+                              {fetchingModels === provider.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin me-1" />
+                              ) : (
+                                <RefreshCw className="h-3 w-3 me-1" />
+                              )}
+                              {locale === "ar" ? "جلب النماذج" : "Fetch Models"}
+                            </Button>
+                          )}
+                        </div>
+                        {provider.id === "azure" ? (
+                          // Azure uses deployment name - text input
+                          <Input
+                            id={`${provider.id}-model`}
+                            placeholder={locale === "ar" ? "اسم النشر (مثال: gpt-4-deployment)" : "Deployment name (e.g., gpt-4-deployment)"}
+                            value={models[provider.id] || provider.model_name || ""}
+                            onChange={(e) => setModels(prev => ({ ...prev, [provider.id]: e.target.value }))}
+                          />
+                        ) : (
+                          // Other providers use dropdown - use fetched models if available
+                          <Select
+                            value={models[provider.id] || provider.model_name || ""}
+                            onValueChange={(value) => setModels(prev => ({ ...prev, [provider.id]: value }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder={locale === "ar" ? "اختر النموذج" : "Select model"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(fetchedModels[provider.id] || DEFAULT_MODELS[provider.id] || []).map((model) => (
+                                <SelectItem key={model} value={model}>
+                                  {model}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                       </div>
 
                       {provider.id === "azure" && (

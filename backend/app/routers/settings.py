@@ -30,9 +30,22 @@ from app.schemas.settings import (
 
 router = APIRouter(tags=["Settings - الإعدادات"])
 
-# Encryption key - in production, this should be from a secure source
-ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", Fernet.generate_key().decode())
-fernet = Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
+# Encryption key - MUST be stable across restarts
+# In production, set ENCRYPTION_KEY environment variable
+# Default key is used for development - DO NOT use in production
+_DEFAULT_KEY = "dGhpc19pc19hX2RlZmF1bHRfa2V5X2Zvcl9kZXY="  # Base64 encoded stable default
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", None)
+
+if ENCRYPTION_KEY:
+    # Use environment variable key
+    fernet = Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
+else:
+    # Generate a stable key from default (for development only)
+    import hashlib
+    key_bytes = hashlib.sha256(_DEFAULT_KEY.encode()).digest()
+    import base64
+    stable_key = base64.urlsafe_b64encode(key_bytes)
+    fernet = Fernet(stable_key)
 
 
 def encrypt_value(value: str) -> str:
@@ -479,3 +492,76 @@ async def test_azure_connection(api_key: str, endpoint: str) -> tuple[bool, str]
         return True, "Connection configured"
     except Exception as e:
         return False, str(e)
+
+
+@router.post("/ai-providers/{provider_id}/fetch-models")
+async def fetch_provider_models(
+    provider_id: str,
+    request: TestConnectionRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Fetch available models from provider API
+    جلب النماذج المتاحة من API المزود
+    """
+    result = await db.execute(
+        select(AIProviderConfig).where(AIProviderConfig.id == provider_id)
+    )
+    provider = result.scalar_one_or_none()
+
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    # Get API key (from request or stored)
+    api_key = request.api_key
+    if not api_key and provider.api_key:
+        api_key = decrypt_value(provider.api_key)
+
+    if not api_key:
+        return {"models": [], "error": "No API key provided"}
+
+    try:
+        if provider_id == "openai":
+            import openai
+            client = openai.OpenAI(api_key=api_key)
+            models_response = client.models.list()
+            # Filter for chat models
+            chat_models = [
+                m.id for m in models_response.data
+                if "gpt" in m.id.lower() and "instruct" not in m.id.lower()
+            ]
+            return {"models": sorted(chat_models, reverse=True)[:10]}
+
+        elif provider_id == "claude":
+            # Anthropic doesn't have a list models endpoint, return known models
+            return {
+                "models": [
+                    "claude-3-5-sonnet-20241022",
+                    "claude-3-5-haiku-20241022",
+                    "claude-3-opus-20240229",
+                    "claude-3-sonnet-20240229",
+                    "claude-3-haiku-20240307",
+                ]
+            }
+
+        elif provider_id == "gemini":
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            models = []
+            for m in genai.list_models():
+                if "generateContent" in m.supported_generation_methods:
+                    models.append(m.name.replace("models/", ""))
+            return {"models": models[:10]}
+
+        elif provider_id == "azure":
+            # Azure uses deployment names, can't list automatically
+            return {
+                "models": [],
+                "message": "Azure uses deployment names. Enter your deployment name manually."
+            }
+
+        else:
+            return {"models": [], "error": "Unknown provider"}
+
+    except Exception as e:
+        return {"models": [], "error": str(e)}

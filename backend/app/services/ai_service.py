@@ -24,17 +24,26 @@ from app.config import settings
 from app.services.rag_service import RAGService
 
 
-# Encryption key for decrypting stored API keys
-ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "")
+# Encryption key for decrypting stored API keys - MUST match settings.py
+_DEFAULT_KEY = "dGhpc19pc19hX2RlZmF1bHRfa2V5X2Zvcl9kZXY="
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", None)
+
+if ENCRYPTION_KEY:
+    _fernet = Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
+else:
+    import hashlib
+    import base64
+    key_bytes = hashlib.sha256(_DEFAULT_KEY.encode()).digest()
+    stable_key = base64.urlsafe_b64encode(key_bytes)
+    _fernet = Fernet(stable_key)
 
 
 def decrypt_api_key(encrypted_key: str) -> str:
     """Decrypt stored API key."""
-    if not encrypted_key or not ENCRYPTION_KEY:
+    if not encrypted_key:
         return ""
     try:
-        fernet = Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
-        return fernet.decrypt(encrypted_key.encode()).decode()
+        return _fernet.decrypt(encrypted_key.encode()).decode()
     except Exception:
         return ""
 

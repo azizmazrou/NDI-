@@ -530,7 +530,7 @@ async def fetch_provider_models(
                 m.id for m in models_response.data
                 if "gpt" in m.id.lower() and "instruct" not in m.id.lower()
             ]
-            return {"models": sorted(chat_models, reverse=True)[:10]}
+            return {"models": sorted(chat_models, reverse=True)}
 
         elif provider_id == "claude":
             # Anthropic doesn't have a list models endpoint, return known models
@@ -551,7 +551,7 @@ async def fetch_provider_models(
             for m in genai.list_models():
                 if "generateContent" in m.supported_generation_methods:
                     models.append(m.name.replace("models/", ""))
-            return {"models": models[:10]}
+            return {"models": models}
 
         elif provider_id == "azure":
             # Azure uses deployment names, can't list automatically

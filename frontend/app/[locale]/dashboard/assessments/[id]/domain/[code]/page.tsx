@@ -338,8 +338,11 @@ export default function DomainQuestionsPage({
 
               <EvidenceUploader
                 responseId={responseIds[currentQuestion.code] || ""}
+                questionCode={currentQuestion.code}
+                targetLevel={responses[currentQuestion.code]?.level ?? undefined}
                 onUpload={(file) => handleUpload(file, currentQuestion.code)}
                 onAnalyze={handleAnalyze}
+                onDelete={(evidenceId) => handleDeleteEvidence(evidenceId, currentQuestion.code)}
                 disabled={!responseIds[currentQuestion.code]}
               />
             </div>

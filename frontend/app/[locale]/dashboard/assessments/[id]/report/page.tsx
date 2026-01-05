@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import Link from "next/link";
 import {
@@ -11,6 +11,13 @@ import {
   CheckCircle2,
   AlertCircle,
   TrendingUp,
+  Sparkles,
+  Loader2,
+  BarChart3,
+  Lightbulb,
+  Target,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,8 +25,45 @@ import { Progress } from "@/components/ui/progress";
 import { PageLoading } from "@/components/ui/loading";
 import { ErrorState } from "@/components/ui/error-state";
 import { useApi } from "@/lib/hooks/use-api";
-import { assessmentsApi } from "@/lib/api";
+import { assessmentsApi, aiApi } from "@/lib/api";
 import { cn, getLevelColor } from "@/lib/utils";
+
+interface GapItem {
+  domain_code: string;
+  domain_name: string;
+  question_code: string;
+  question: string;
+  current_level: number;
+  target_level: number;
+  gap: number;
+  priority: string;
+  recommendation: string;
+}
+
+interface GapAnalysisResult {
+  status: string;
+  assessment_id: string;
+  target_level: number;
+  total_gaps: number;
+  high_priority_gaps: number;
+  gaps: GapItem[];
+}
+
+interface Recommendation {
+  priority: string;
+  domain_code?: string;
+  title: string;
+  description: string;
+  expected_impact: string;
+  effort_level: string;
+  steps?: string[];
+}
+
+interface RecommendationsResult {
+  status: string;
+  total_recommendations: number;
+  recommendations: Recommendation[];
+}
 
 export default function AssessmentReportPage({
   params,
@@ -30,9 +74,75 @@ export default function AssessmentReportPage({
   const locale = useLocale();
   const Arrow = locale === "ar" ? ArrowLeft : ArrowRight;
 
+  // State for AI features
+  const [loadingGapAnalysis, setLoadingGapAnalysis] = useState(false);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+  const [gapAnalysis, setGapAnalysis] = useState<GapAnalysisResult | null>(null);
+  const [recommendations, setRecommendations] = useState<RecommendationsResult | null>(null);
+  const [gapError, setGapError] = useState<string | null>(null);
+  const [recError, setRecError] = useState<string | null>(null);
+  const [expandedGaps, setExpandedGaps] = useState<Set<string>>(new Set());
+
   // Fetch report
   const fetchReport = useCallback(() => assessmentsApi.getReport(params.id), [params.id]);
   const { data: report, loading, error, refetch } = useApi(fetchReport, [params.id]);
+
+  const handleGapAnalysis = async () => {
+    setLoadingGapAnalysis(true);
+    setGapError(null);
+
+    try {
+      const result = await aiApi.gapAnalysis({
+        assessment_id: params.id,
+        target_level: report?.target_level,
+        language: locale,
+      });
+
+      if (result.status === "success") {
+        setGapAnalysis(result);
+      } else {
+        setGapError(result.message || (locale === "ar" ? "فشل في التحليل" : "Analysis failed"));
+      }
+    } catch (error: any) {
+      setGapError(error.message || (locale === "ar" ? "فشل في الاتصال بالخدمة" : "Failed to connect"));
+    } finally {
+      setLoadingGapAnalysis(false);
+    }
+  };
+
+  const handleGetRecommendations = async () => {
+    setLoadingRecommendations(true);
+    setRecError(null);
+
+    try {
+      const result = await aiApi.getRecommendations({
+        assessment_id: params.id,
+        language: locale,
+      });
+
+      if (result.status === "success") {
+        setRecommendations(result);
+      } else {
+        setRecError(result.message || (locale === "ar" ? "فشل في الحصول على التوصيات" : "Failed to get recommendations"));
+      }
+    } catch (error: any) {
+      setRecError(error.message || (locale === "ar" ? "فشل في الاتصال بالخدمة" : "Failed to connect"));
+    } finally {
+      setLoadingRecommendations(false);
+    }
+  };
+
+  const toggleGapExpanded = (code: string) => {
+    setExpandedGaps((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) {
+        next.delete(code);
+      } else {
+        next.add(code);
+      }
+      return next;
+    });
+  };
 
   if (loading) {
     return <PageLoading text={locale === "ar" ? "جاري إنشاء التقرير..." : "Generating report..."} />;
@@ -52,6 +162,19 @@ export default function AssessmentReportPage({
       5: { en: "Pioneer", ar: "الريادة" },
     };
     return locale === "ar" ? names[level]?.ar : names[level]?.en;
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority.toLowerCase()) {
+      case "high":
+        return "bg-red-100 text-red-700 border-red-200";
+      case "medium":
+        return "bg-amber-100 text-amber-700 border-amber-200";
+      case "low":
+        return "bg-green-100 text-green-700 border-green-200";
+      default:
+        return "bg-gray-100 text-gray-700 border-gray-200";
+    }
   };
 
   const gapToTarget = Math.max(0, report.target_level - (report.overall_score || 0));
@@ -202,21 +325,285 @@ export default function AssessmentReportPage({
         </CardContent>
       </Card>
 
-      {/* Recommendations */}
-      <Card>
+      {/* AI Gap Analysis */}
+      <Card className="print:break-before-page">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-amber-500" />
-            {locale === "ar" ? "التوصيات" : "Recommendations"}
-          </CardTitle>
-          <CardDescription>
-            {locale === "ar"
-              ? "الإجراءات المقترحة لتحسين مستوى النضج"
-              : "Suggested actions to improve maturity level"}
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-blue-500" />
+                {locale === "ar" ? "تحليل الفجوات بالذكاء الاصطناعي" : "AI Gap Analysis"}
+              </CardTitle>
+              <CardDescription>
+                {locale === "ar"
+                  ? "تحليل مفصل للفجوات بين المستوى الحالي والمستهدف"
+                  : "Detailed analysis of gaps between current and target levels"}
+              </CardDescription>
+            </div>
+            {!gapAnalysis && (
+              <Button
+                onClick={handleGapAnalysis}
+                disabled={loadingGapAnalysis}
+                className="print:hidden"
+              >
+                {loadingGapAnalysis ? (
+                  <Loader2 className="h-4 w-4 animate-spin me-2" />
+                ) : (
+                  <Sparkles className="h-4 w-4 me-2" />
+                )}
+                {locale === "ar" ? "تحليل الفجوات" : "Analyze Gaps"}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          {report.recommendations?.length > 0 ? (
+          {loadingGapAnalysis && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ms-2">{locale === "ar" ? "جاري التحليل..." : "Analyzing..."}</span>
+            </div>
+          )}
+
+          {gapError && (
+            <div className="text-red-600 bg-red-50 p-4 rounded-lg">
+              <AlertCircle className="h-5 w-5 inline me-2" />
+              {gapError}
+            </div>
+          )}
+
+          {gapAnalysis && gapAnalysis.gaps?.length > 0 && (
+            <div className="space-y-4">
+              {/* Summary */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+                <div className="text-center">
+                  <p className="text-2xl font-bold">{gapAnalysis.total_gaps}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {locale === "ar" ? "إجمالي الفجوات" : "Total Gaps"}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-red-600">{gapAnalysis.high_priority_gaps}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {locale === "ar" ? "أولوية عالية" : "High Priority"}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold">{gapAnalysis.target_level}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {locale === "ar" ? "المستوى المستهدف" : "Target Level"}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-green-600">
+                    {gapAnalysis.gaps.filter((g) => g.gap <= 0).length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {locale === "ar" ? "تم تحقيقه" : "Achieved"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Gap items */}
+              <div className="space-y-2">
+                {gapAnalysis.gaps.map((gap, idx) => (
+                  <div
+                    key={`${gap.question_code}-${idx}`}
+                    className="border rounded-lg overflow-hidden"
+                  >
+                    <button
+                      className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors"
+                      onClick={() => toggleGapExpanded(gap.question_code)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-mono bg-primary/10 text-primary px-2 py-1 rounded">
+                          {gap.question_code}
+                        </span>
+                        <span className={cn(
+                          "text-xs px-2 py-0.5 rounded border",
+                          getPriorityColor(gap.priority)
+                        )}>
+                          {gap.priority}
+                        </span>
+                        <span className="text-sm font-medium">
+                          {locale === "ar" ? gap.domain_name : gap.domain_name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1 text-sm">
+                          <span className={cn("font-bold", getLevelColor(gap.current_level))}>
+                            {gap.current_level}
+                          </span>
+                          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-bold text-primary">{gap.target_level}</span>
+                        </div>
+                        {expandedGaps.has(gap.question_code) ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </div>
+                    </button>
+                    {expandedGaps.has(gap.question_code) && (
+                      <div className="p-4 bg-muted/20 border-t space-y-3">
+                        <div>
+                          <h4 className="text-sm font-medium mb-1">
+                            {locale === "ar" ? "السؤال" : "Question"}
+                          </h4>
+                          <p className="text-sm text-muted-foreground">{gap.question}</p>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-medium mb-1 flex items-center gap-2">
+                            <Lightbulb className="h-4 w-4 text-amber-500" />
+                            {locale === "ar" ? "التوصية" : "Recommendation"}
+                          </h4>
+                          <p className="text-sm">{gap.recommendation}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {gapAnalysis && (!gapAnalysis.gaps || gapAnalysis.gaps.length === 0) && (
+            <div className="text-center py-8">
+              <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
+              <p className="text-lg font-medium text-green-600">
+                {locale === "ar" ? "لا توجد فجوات!" : "No gaps found!"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {locale === "ar"
+                  ? "التقييم يلبي المستوى المستهدف"
+                  : "Assessment meets the target level"}
+              </p>
+            </div>
+          )}
+
+          {!gapAnalysis && !loadingGapAnalysis && !gapError && (
+            <div className="text-center py-8">
+              <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-sm text-muted-foreground">
+                {locale === "ar"
+                  ? "انقر على 'تحليل الفجوات' لبدء التحليل بالذكاء الاصطناعي"
+                  : "Click 'Analyze Gaps' to start AI analysis"}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* AI Recommendations */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-amber-500" />
+                {locale === "ar" ? "التوصيات الذكية" : "AI Recommendations"}
+              </CardTitle>
+              <CardDescription>
+                {locale === "ar"
+                  ? "الإجراءات المقترحة لتحسين مستوى النضج"
+                  : "Suggested actions to improve maturity level"}
+              </CardDescription>
+            </div>
+            {!recommendations && (
+              <Button
+                onClick={handleGetRecommendations}
+                disabled={loadingRecommendations}
+                className="print:hidden"
+              >
+                {loadingRecommendations ? (
+                  <Loader2 className="h-4 w-4 animate-spin me-2" />
+                ) : (
+                  <Sparkles className="h-4 w-4 me-2" />
+                )}
+                {locale === "ar" ? "احصل على توصيات" : "Get Recommendations"}
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingRecommendations && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ms-2">{locale === "ar" ? "جاري التحليل..." : "Analyzing..."}</span>
+            </div>
+          )}
+
+          {recError && (
+            <div className="text-red-600 bg-red-50 p-4 rounded-lg">
+              <AlertCircle className="h-5 w-5 inline me-2" />
+              {recError}
+            </div>
+          )}
+
+          {recommendations && recommendations.recommendations?.length > 0 && (
+            <div className="space-y-4">
+              {recommendations.recommendations.map((rec, index) => (
+                <div
+                  key={index}
+                  className="border rounded-lg p-4 space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <span className="flex-shrink-0 h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
+                        {index + 1}
+                      </span>
+                      <div>
+                        <h4 className="font-medium">{rec.title}</h4>
+                        {rec.domain_code && (
+                          <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                            {rec.domain_code}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className={cn(
+                      "text-xs px-2 py-1 rounded border",
+                      getPriorityColor(rec.priority)
+                    )}>
+                      {rec.priority}
+                    </span>
+                  </div>
+
+                  <p className="text-sm text-muted-foreground">{rec.description}</p>
+
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">
+                        {locale === "ar" ? "التأثير المتوقع:" : "Expected Impact:"}
+                      </span>
+                      <span className="ms-1 font-medium">{rec.expected_impact}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">
+                        {locale === "ar" ? "مستوى الجهد:" : "Effort Level:"}
+                      </span>
+                      <span className="ms-1 font-medium">{rec.effort_level}</span>
+                    </div>
+                  </div>
+
+                  {rec.steps && rec.steps.length > 0 && (
+                    <div>
+                      <h5 className="text-sm font-medium mb-2">
+                        {locale === "ar" ? "الخطوات:" : "Steps:"}
+                      </h5>
+                      <ol className="text-sm space-y-1 list-decimal list-inside">
+                        {rec.steps.map((step, sidx) => (
+                          <li key={sidx}>{step}</li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Fallback to report recommendations */}
+          {!recommendations && !loadingRecommendations && !recError && report.recommendations?.length > 0 && (
             <ul className="space-y-3">
               {report.recommendations.map((rec: string, index: number) => (
                 <li key={index} className="flex gap-3">
@@ -227,16 +614,16 @@ export default function AssessmentReportPage({
                 </li>
               ))}
             </ul>
-          ) : (
+          )}
+
+          {!recommendations && !loadingRecommendations && !recError && !report.recommendations?.length && (
             <div className="text-center py-8">
+              <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-sm text-muted-foreground">
                 {locale === "ar"
-                  ? "استخدم ميزة التحليل بالذكاء الاصطناعي للحصول على توصيات مخصصة"
-                  : "Use the AI analysis feature to get personalized recommendations"}
+                  ? "انقر على 'احصل على توصيات' للحصول على توصيات مخصصة بالذكاء الاصطناعي"
+                  : "Click 'Get Recommendations' to get AI-powered personalized recommendations"}
               </p>
-              <Button variant="outline" className="mt-4">
-                {locale === "ar" ? "تحليل بالذكاء الاصطناعي" : "AI Analysis"}
-              </Button>
             </div>
           )}
         </CardContent>

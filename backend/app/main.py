@@ -10,9 +10,17 @@ from sqlalchemy import select
 
 from app.config import settings as app_settings
 from app.database import init_db, close_db, async_session_maker
+
+# IMPORTANT: Import ALL models to ensure tables are created by init_db()
+# This must be done BEFORE init_db() is called in the lifespan handler
+from app.models import (
+    NDIDomain, NDIQuestion, NDIMaturityLevel, NDIAcceptanceEvidence,
+    Assessment, AssessmentResponse, Evidence, User, Task, Embedding,
+    Setting, AIProviderConfig, OrganizationSettings
+)
+
 from app.routers import assessments, ndi, evidence, ai, tasks, scores, dashboard, reports, admin
 from app.routers import settings as settings_router
-from app.models.settings import AIProviderConfig
 
 # Ensure uploads directory exists
 os.makedirs(app_settings.upload_dir, exist_ok=True)

@@ -27,6 +27,8 @@ export default function DomainQuestionsPage({
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [responses, setResponses] = useState<Record<string, { level: number | null; justification: string }>>({});
   const [savedQuestions, setSavedQuestions] = useState<Set<string>>(new Set());
+  const [responseIds, setResponseIds] = useState<Record<string, string>>({});
+  const [uploadedEvidence, setUploadedEvidence] = useState<Record<string, any[]>>({});
 
   // Fetch assessment
   const fetchAssessment = useCallback(() => assessmentsApi.get(params.id), [params.id]);
@@ -52,18 +54,29 @@ export default function DomainQuestionsPage({
   useState(() => {
     if (existingResponses) {
       const initialResponses: Record<string, { level: number | null; justification: string }> = {};
+      const initialResponseIds: Record<string, string> = {};
+      const initialEvidence: Record<string, any[]> = {};
+
       existingResponses.forEach((r: any) => {
         if (r.question) {
           initialResponses[r.question.code] = {
             level: r.selected_level,
             justification: r.justification || "",
           };
+          // Store the response ID for evidence uploads
+          initialResponseIds[r.question.code] = r.id;
+          // Store existing evidence
+          if (r.evidence && r.evidence.length > 0) {
+            initialEvidence[r.question.code] = r.evidence;
+          }
           if (r.selected_level !== null) {
             setSavedQuestions((prev) => new Set([...Array.from(prev), r.question.code]));
           }
         }
       });
       setResponses(initialResponses);
+      setResponseIds(initialResponseIds);
+      setUploadedEvidence(initialEvidence);
     }
   });
 
@@ -72,26 +85,61 @@ export default function DomainQuestionsPage({
     if (response?.level === null || response?.level === undefined) return;
 
     try {
-      await saveMutation.mutate({
+      const savedResponse = await saveMutation.mutate({
         question_id: questionId,
         selected_level: response.level,
         justification: response.justification,
       });
+      // Store the response ID for evidence uploads
+      if (savedResponse?.id) {
+        setResponseIds((prev) => ({ ...prev, [questionCode]: savedResponse.id }));
+      }
       setSavedQuestions((prev) => new Set([...Array.from(prev), questionCode]));
     } catch (err) {
       console.error("Failed to save response:", err);
     }
   };
 
-  const handleUpload = async (file: File) => {
-    // This would need the response ID - for now we'll just log
-    console.log("Upload file:", file.name);
-    return { id: "temp-id" };
+  const handleUpload = async (file: File, questionCode: string) => {
+    const responseId = responseIds[questionCode];
+    if (!responseId) {
+      console.error("Response must be saved before uploading evidence");
+      throw new Error(locale === "ar" ? "يجب حفظ الإجابة أولاً قبل رفع الأدلة" : "Save the response first before uploading evidence");
+    }
+
+    try {
+      const result = await evidenceApi.upload(responseId, file);
+      // Add to uploaded evidence
+      setUploadedEvidence((prev) => ({
+        ...prev,
+        [questionCode]: [...(prev[questionCode] || []), result],
+      }));
+      return result;
+    } catch (err) {
+      console.error("Failed to upload evidence:", err);
+      throw err;
+    }
   };
 
   const handleAnalyze = async (evidenceId: string) => {
-    console.log("Analyze evidence:", evidenceId);
-    return {};
+    try {
+      return await evidenceApi.analyze(evidenceId);
+    } catch (err) {
+      console.error("Failed to analyze evidence:", err);
+      return {};
+    }
+  };
+
+  const handleDeleteEvidence = async (evidenceId: string, questionCode: string) => {
+    try {
+      await evidenceApi.delete(evidenceId);
+      setUploadedEvidence((prev) => ({
+        ...prev,
+        [questionCode]: (prev[questionCode] || []).filter((e) => e.id !== evidenceId),
+      }));
+    } catch (err) {
+      console.error("Failed to delete evidence:", err);
+    }
   };
 
   if (loadingAssessment || loadingDomain || loadingResponses) {
@@ -235,10 +283,48 @@ export default function DomainQuestionsPage({
               <h3 className="font-medium">
                 {locale === "ar" ? "الأدلة والمستندات" : "Evidence & Documents"}
               </h3>
+
+              {/* Show message if response not saved yet */}
+              {!responseIds[currentQuestion.code] && (
+                <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                  {locale === "ar"
+                    ? "يجب حفظ الإجابة أولاً قبل رفع الأدلة"
+                    : "Save the response first before uploading evidence"}
+                </div>
+              )}
+
+              {/* Show existing evidence */}
+              {uploadedEvidence[currentQuestion.code]?.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  {uploadedEvidence[currentQuestion.code].map((evidence: any) => (
+                    <div
+                      key={evidence.id}
+                      className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{evidence.file_name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {evidence.file_type?.toUpperCase()}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteEvidence(evidence.id, currentQuestion.code)}
+                        className="text-destructive"
+                      >
+                        {locale === "ar" ? "حذف" : "Delete"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <EvidenceUploader
-                responseId="temp"
-                onUpload={handleUpload}
+                responseId={responseIds[currentQuestion.code] || ""}
+                onUpload={(file) => handleUpload(file, currentQuestion.code)}
                 onAnalyze={handleAnalyze}
+                disabled={!responseIds[currentQuestion.code]}
               />
             </div>
 

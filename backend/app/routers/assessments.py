@@ -25,6 +25,7 @@ from app.schemas.assessment import (
 from app.schemas.ndi import NDIDomainResponse, NDIQuestionWithLevels, NDIMaturityLevelResponse
 from app.services.assessment_service import AssessmentService
 from app.services.score_service import ScoreService
+from app.routers.ndi import maturity_level_to_response
 
 router = APIRouter()
 
@@ -296,12 +297,13 @@ async def get_assessment_responses(
     if not assessment_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Assessment not found")
 
+    from app.models.ndi import NDIMaturityLevel
     query = (
         select(AssessmentResponseModel)
         .options(
-            selectinload(AssessmentResponseModel.question).selectinload(
-                NDIQuestion.maturity_levels
-            ),
+            selectinload(AssessmentResponseModel.question)
+            .selectinload(NDIQuestion.maturity_levels)
+            .selectinload(NDIMaturityLevel.acceptance_evidence),
             selectinload(AssessmentResponseModel.question).selectinload(
                 NDIQuestion.domain
             ),
@@ -337,9 +339,9 @@ async def get_assessment_responses(
                 code=r.question.code,
                 question_en=r.question.question_en,
                 question_ar=r.question.question_ar,
-                sort_order=r.question.sort_order,
+                sort_order=r.question.sort_order or 0,
                 maturity_levels=[
-                    NDIMaturityLevelResponse.model_validate(ml)
+                    maturity_level_to_response(ml)
                     for ml in sorted(r.question.maturity_levels, key=lambda x: x.level)
                 ],
             )
@@ -400,13 +402,14 @@ async def create_or_update_response(
     await db.flush()
     await db.refresh(response)
 
-    # Reload with relationships
+    # Reload with relationships including acceptance_evidence
+    from app.models.ndi import NDIMaturityLevel
     result = await db.execute(
         select(AssessmentResponseModel)
         .options(
-            selectinload(AssessmentResponseModel.question).selectinload(
-                NDIQuestion.maturity_levels
-            ),
+            selectinload(AssessmentResponseModel.question)
+            .selectinload(NDIQuestion.maturity_levels)
+            .selectinload(NDIMaturityLevel.acceptance_evidence),
             selectinload(AssessmentResponseModel.evidence),
         )
         .where(AssessmentResponseModel.id == response.id)
@@ -428,9 +431,9 @@ async def create_or_update_response(
             code=response.question.code,
             question_en=response.question.question_en,
             question_ar=response.question.question_ar,
-            sort_order=response.question.sort_order,
+            sort_order=response.question.sort_order or 0,
             maturity_levels=[
-                NDIMaturityLevelResponse.model_validate(ml)
+                maturity_level_to_response(ml)
                 for ml in sorted(response.question.maturity_levels, key=lambda x: x.level)
             ],
         )

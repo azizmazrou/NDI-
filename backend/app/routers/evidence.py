@@ -172,7 +172,20 @@ async def analyze_evidence(
     if not evidence:
         raise HTTPException(status_code=404, detail="Evidence not found")
 
-    service = EvidenceService(db)
-    analysis = await service.analyze_evidence(evidence_id)
-
-    return analysis
+    try:
+        service = EvidenceService(db)
+        analysis = await service.analyze_evidence(evidence_id)
+        return analysis
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        # Return a fallback analysis on error
+        return EvidenceAnalysis(
+            supports_level="no",
+            covered_criteria=[],
+            missing_criteria=[],
+            confidence_score=0.0,
+            recommendations=[f"Analysis error: {str(e)}. Please check AI provider settings."],
+            summary_ar=f"خطأ في التحليل: {str(e)}",
+            summary_en=f"Analysis error: {str(e)}",
+        )

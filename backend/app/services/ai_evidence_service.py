@@ -460,6 +460,11 @@ class AIEvidenceService:
 
     async def _call_llm(self, prompt: str) -> str:
         """Call the configured LLM from database settings."""
+        import asyncio
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         ai_provider = await self._get_ai_provider()
 
         if not ai_provider or not ai_provider.get("api_key"):
@@ -470,11 +475,14 @@ class AIEvidenceService:
         model_name = ai_provider.get("model_name", "")
         api_endpoint = ai_provider.get("api_endpoint", "")
 
+        logger.info(f"Calling LLM with provider: {provider_id}, model: {model_name}")
+
         if provider_id == "gemini":
             import google.generativeai as genai
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(model_name or "gemini-pro")
-            response = model.generate_content(prompt)
+            # Run sync call in thread pool to avoid blocking
+            response = await asyncio.to_thread(model.generate_content, prompt)
             return response.text
 
         elif provider_id == "openai":

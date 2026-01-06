@@ -46,15 +46,20 @@ class GapItem(BaseModel):
     current_level: int
     target_level: int
     gap: int
-    actions_required: list[str]
+    actions_required: list[str] = []
     priority: str  # high, medium, low
+    recommendation: str = ""  # Frontend expects this
 
 
 class GapAnalysisResponse(BaseModel):
     """Response from gap analysis."""
 
+    status: str = "success"  # Frontend expects this
     assessment_id: UUID
+    target_level: int = 3  # Frontend expects this
     overall_gap: float
+    total_gaps: int = 0  # Frontend expects this
+    high_priority_gaps: int = 0  # Frontend expects this
     gaps: list[GapItem]
     summary: str
     quick_wins: list[str]
@@ -78,15 +83,20 @@ class Recommendation(BaseModel):
     description: str
     priority: str  # high, medium, low
     effort: str  # low, medium, high
+    effort_level: str = ""  # Frontend expects this (duplicate of effort)
     impact: str  # low, medium, high
+    expected_impact: str = ""  # Frontend expects this
     prerequisites: list[str] = []
     expected_outcome: str
+    steps: list[str] = []  # Frontend expects this
 
 
 class RecommendationResponse(BaseModel):
     """Response with recommendations."""
 
+    status: str = "success"  # Frontend expects this
     assessment_id: UUID
+    total_recommendations: int = 0  # Frontend expects this
     recommendations: list[Recommendation]
     roadmap_summary: str
 

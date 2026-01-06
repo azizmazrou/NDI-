@@ -42,91 +42,125 @@ class AIEvidenceService:
         language: str = "ar",
     ) -> Dict[str, Any]:
         """تحليل الشواهد المرفقة لإجابة محددة."""
+        try:
+            ai_provider = await self._get_ai_provider()
+            if not ai_provider or not ai_provider.get("api_key"):
+                return {
+                    "status": "error",
+                    "message": "AI not configured. Please configure AI providers in Settings." if language == "en" else "الذكاء الاصطناعي غير مُعد. يرجى تكوين مزودي الذكاء الاصطناعي في الإعدادات.",
+                }
 
-        ai_provider = await self._get_ai_provider()
-        if not ai_provider or not ai_provider.get("api_key"):
+            # Get response with evidence
+            result = await self.db.execute(
+                select(AssessmentResponse)
+                .options(
+                    selectinload(AssessmentResponse.evidence),
+                    selectinload(AssessmentResponse.question)
+                    .selectinload(NDIQuestion.maturity_levels)
+                    .selectinload(NDIMaturityLevel.acceptance_evidence),
+                )
+                .where(AssessmentResponse.id == response_id)
+            )
+            response = result.scalar_one_or_none()
+
+            if not response:
+                return {
+                    "status": "error",
+                    "message": "Response not found" if language == "en" else "الإجابة غير موجودة",
+                }
+
+            if response.selected_level is None:
+                return {
+                    "status": "error",
+                    "message": "No level selected" if language == "en" else "لم يتم اختيار مستوى",
+                }
+
+            # Get maturity level details
+            maturity_level = None
+            for ml in response.question.maturity_levels:
+                if ml.level == response.selected_level:
+                    maturity_level = ml
+                    break
+
+            if not maturity_level:
+                return {
+                    "status": "error",
+                    "message": f"Maturity level {response.selected_level} not found" if language == "en" else f"مستوى النضج {response.selected_level} غير موجود",
+                }
+
+            # Get acceptance criteria
+            acceptance_criteria = []
+            for ev in maturity_level.acceptance_evidence:
+                text = ev.text_ar if language == "ar" else ev.text_en
+                acceptance_criteria.append({
+                    "id": ev.evidence_id,
+                    "text": text,
+                })
+
+            # Check if there's any evidence to analyze
+            if not response.evidence:
+                return {
+                    "status": "success",
+                    "response_id": str(response_id),
+                    "question_code": response.question.code,
+                    "selected_level": response.selected_level,
+                    "acceptance_criteria": acceptance_criteria,
+                    "evidence_analyses": [],
+                    "coverage": {
+                        "total_criteria": len(acceptance_criteria),
+                        "covered_count": 0,
+                        "coverage_percentage": 0.0,
+                        "missing_criteria": acceptance_criteria,
+                    },
+                    "recommendations": self._generate_recommendations(acceptance_criteria, language),
+                    "message": "No evidence uploaded yet" if language == "en" else "لم يتم رفع شواهد بعد",
+                }
+
+            # Analyze each evidence
+            evidence_analyses = []
+            for evidence in response.evidence:
+                analysis = await self._analyze_single_evidence(
+                    evidence,
+                    acceptance_criteria,
+                    language,
+                )
+                evidence_analyses.append(analysis)
+
+            # Aggregate results
+            total_criteria = len(acceptance_criteria)
+            covered_criteria = set()
+            for analysis in evidence_analyses:
+                for criterion_id in analysis.get("covered_criteria_ids", []):
+                    covered_criteria.add(criterion_id)
+
+            coverage_percentage = (len(covered_criteria) / total_criteria * 100) if total_criteria > 0 else 0
+
+            missing_criteria = [
+                c for c in acceptance_criteria
+                if c["id"] not in covered_criteria
+            ]
+
             return {
-                "status": "error",
-                "message": "AI not configured. Please configure AI providers in Settings.",
+                "status": "success",
+                "response_id": str(response_id),
+                "question_code": response.question.code,
+                "selected_level": response.selected_level,
+                "acceptance_criteria": acceptance_criteria,
+                "evidence_analyses": evidence_analyses,
+                "coverage": {
+                    "total_criteria": total_criteria,
+                    "covered_count": len(covered_criteria),
+                    "coverage_percentage": round(coverage_percentage, 1),
+                    "missing_criteria": missing_criteria,
+                },
+                "recommendations": self._generate_recommendations(missing_criteria, language),
             }
 
-        # Get response with evidence
-        result = await self.db.execute(
-            select(AssessmentResponse)
-            .options(
-                selectinload(AssessmentResponse.evidence),
-                selectinload(AssessmentResponse.question)
-                .selectinload(NDIQuestion.maturity_levels)
-                .selectinload(NDIMaturityLevel.acceptance_evidence),
-            )
-            .where(AssessmentResponse.id == response_id)
-        )
-        response = result.scalar_one_or_none()
-
-        if not response:
-            return {"status": "error", "message": "Response not found"}
-
-        if response.selected_level is None:
-            return {"status": "error", "message": "No level selected"}
-
-        # Get maturity level details
-        maturity_level = None
-        for ml in response.question.maturity_levels:
-            if ml.level == response.selected_level:
-                maturity_level = ml
-                break
-
-        if not maturity_level:
-            return {"status": "error", "message": "Maturity level not found"}
-
-        # Get acceptance criteria
-        acceptance_criteria = []
-        for ev in maturity_level.acceptance_evidence:
-            text = ev.text_ar if language == "ar" else ev.text_en
-            acceptance_criteria.append({
-                "id": ev.evidence_id,
-                "text": text,
-            })
-
-        # Analyze each evidence
-        evidence_analyses = []
-        for evidence in response.evidence:
-            analysis = await self._analyze_single_evidence(
-                evidence,
-                acceptance_criteria,
-                language,
-            )
-            evidence_analyses.append(analysis)
-
-        # Aggregate results
-        total_criteria = len(acceptance_criteria)
-        covered_criteria = set()
-        for analysis in evidence_analyses:
-            for criterion_id in analysis.get("covered_criteria_ids", []):
-                covered_criteria.add(criterion_id)
-
-        coverage_percentage = (len(covered_criteria) / total_criteria * 100) if total_criteria > 0 else 0
-
-        missing_criteria = [
-            c for c in acceptance_criteria
-            if c["id"] not in covered_criteria
-        ]
-
-        return {
-            "status": "success",
-            "response_id": str(response_id),
-            "question_code": response.question.code,
-            "selected_level": response.selected_level,
-            "acceptance_criteria": acceptance_criteria,
-            "evidence_analyses": evidence_analyses,
-            "coverage": {
-                "total_criteria": total_criteria,
-                "covered_count": len(covered_criteria),
-                "coverage_percentage": round(coverage_percentage, 1),
-                "missing_criteria": missing_criteria,
-            },
-            "recommendations": self._generate_recommendations(missing_criteria, language),
-        }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Error analyzing evidence: {str(e)}" if language == "en" else f"خطأ في تحليل الشواهد: {str(e)}",
+            }
 
     async def _analyze_single_evidence(
         self,
@@ -207,67 +241,80 @@ class AIEvidenceService:
         language: str = "ar",
     ) -> Dict[str, Any]:
         """اقتراح هيكل الدليل المطلوب."""
+        try:
+            ai_provider = await self._get_ai_provider()
+            if not ai_provider or not ai_provider.get("api_key"):
+                return {
+                    "status": "error",
+                    "message": "AI not configured. Please configure AI providers in Settings." if language == "en" else "الذكاء الاصطناعي غير مُعد. يرجى تكوين مزودي الذكاء الاصطناعي في الإعدادات.",
+                }
 
-        ai_provider = await self._get_ai_provider()
-        if not ai_provider or not ai_provider.get("api_key"):
-            return {
-                "status": "error",
-                "message": "AI not configured. Please configure AI providers in Settings.",
-            }
-
-        # Get question and maturity level
-        result = await self.db.execute(
-            select(NDIQuestion)
-            .options(
-                selectinload(NDIQuestion.maturity_levels)
-                .selectinload(NDIMaturityLevel.acceptance_evidence)
+            # Get question and maturity level
+            result = await self.db.execute(
+                select(NDIQuestion)
+                .options(
+                    selectinload(NDIQuestion.maturity_levels)
+                    .selectinload(NDIMaturityLevel.acceptance_evidence)
+                )
+                .where(NDIQuestion.code == question_code.upper())
             )
-            .where(NDIQuestion.code == question_code.upper())
-        )
-        question = result.scalar_one_or_none()
+            question = result.scalar_one_or_none()
 
-        if not question:
-            return {"status": "error", "message": "Question not found"}
+            if not question:
+                return {
+                    "status": "error",
+                    "message": f"Question not found: {question_code}" if language == "en" else f"السؤال غير موجود: {question_code}",
+                }
 
-        # Find target maturity level
-        maturity_level = None
-        for ml in question.maturity_levels:
-            if ml.level == target_level:
-                maturity_level = ml
-                break
+            # Find target maturity level
+            maturity_level = None
+            for ml in question.maturity_levels:
+                if ml.level == target_level:
+                    maturity_level = ml
+                    break
 
-        if not maturity_level:
-            return {"status": "error", "message": "Maturity level not found"}
+            if not maturity_level:
+                return {
+                    "status": "error",
+                    "message": f"Maturity level {target_level} not found for question {question_code}" if language == "en" else f"مستوى النضج {target_level} غير موجود للسؤال {question_code}",
+                }
 
-        # Get acceptance criteria
-        acceptance_criteria = []
-        for ev in maturity_level.acceptance_evidence:
-            text = ev.text_ar if language == "ar" else ev.text_en
-            acceptance_criteria.append(text)
+            # Get acceptance criteria
+            acceptance_criteria = []
+            for ev in maturity_level.acceptance_evidence:
+                text = ev.text_ar if language == "ar" else ev.text_en
+                acceptance_criteria.append(text)
 
-        level_description = maturity_level.description_ar if language == "ar" else maturity_level.description_en
-        question_text = question.question_ar if language == "ar" else question.question_en
-        level_name = maturity_level.name_ar if language == "ar" else maturity_level.name_en
-        acceptance_criteria_text = chr(10).join(f'- {c}' for c in acceptance_criteria)
+            level_description = maturity_level.description_ar if language == "ar" else maturity_level.description_en
+            question_text = question.question_ar if language == "ar" else question.question_en
+            level_name = maturity_level.name_ar if language == "ar" else maturity_level.name_en
+            acceptance_criteria_text = chr(10).join(f'- {c}' for c in acceptance_criteria) if acceptance_criteria else "No criteria defined"
 
-        # Try to get prompt from database
-        prompt_template = await get_system_prompt(self.db, "evidence_structure")
-        if prompt_template:
-            prompt = prompt_template.format(
-                question_text=question_text,
-                target_level=target_level,
-                level_name=level_name,
-                level_description=level_description,
-                acceptance_criteria=acceptance_criteria_text
-            )
-        else:
-            # Fallback default prompt
-            prompt = f"""
+            # Try to get prompt from database
+            prompt_template = await get_system_prompt(self.db, "evidence_structure")
+            if prompt_template:
+                try:
+                    prompt = prompt_template.format(
+                        question_text=question_text or "",
+                        target_level=target_level,
+                        level_name=level_name or "",
+                        level_description=level_description or "",
+                        acceptance_criteria=acceptance_criteria_text
+                    )
+                except KeyError as e:
+                    # Fallback if prompt template has different placeholders
+                    prompt = None
+            else:
+                prompt = None
+
+            if not prompt:
+                # Fallback default prompt
+                prompt = f"""
 أنت مستشار في مؤشر البيانات الوطني (NDI).
 
-السؤال: {question_text}
-المستوى المستهدف: {target_level} - {level_name}
-وصف المستوى: {level_description}
+السؤال: {question_text or 'غير محدد'}
+المستوى المستهدف: {target_level} - {level_name or 'غير محدد'}
+وصف المستوى: {level_description or 'غير محدد'}
 
 معايير القبول / الشواهد المطلوبة:
 {acceptance_criteria_text}
@@ -294,13 +341,15 @@ class AIEvidenceService:
 }}
 """
 
-        try:
             response_text = await self._call_llm(prompt)
             response_text = response_text.strip()
             if response_text.startswith("```"):
-                response_text = response_text.split("```")[1]
-                if response_text.startswith("json"):
-                    response_text = response_text[4:]
+                parts = response_text.split("```")
+                if len(parts) >= 2:
+                    response_text = parts[1]
+                    if response_text.startswith("json"):
+                        response_text = response_text[4:]
+                    response_text = response_text.strip()
 
             suggestion = json.loads(response_text)
             return {
@@ -311,10 +360,15 @@ class AIEvidenceService:
                 "suggestion": suggestion,
             }
 
+        except json.JSONDecodeError as e:
+            return {
+                "status": "error",
+                "message": f"Failed to parse AI response: {str(e)}" if language == "en" else f"فشل في تحليل استجابة الذكاء الاصطناعي: {str(e)}",
+            }
         except Exception as e:
             return {
                 "status": "error",
-                "message": str(e),
+                "message": f"Error generating structure suggestion: {str(e)}" if language == "en" else f"خطأ في توليد اقتراح الهيكل: {str(e)}",
             }
 
     async def quick_check(

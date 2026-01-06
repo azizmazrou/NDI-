@@ -137,6 +137,7 @@ class EvidenceService:
                 selectinload(Evidence.response)
                 .selectinload(AssessmentResponse.question)
                 .selectinload(NDIQuestion.maturity_levels)
+                .selectinload(NDIMaturityLevel.acceptance_evidence)
             )
             .where(Evidence.id == evidence_id)
         )
@@ -173,12 +174,17 @@ class EvidenceService:
                 recommendations=["Maturity level criteria not found"],
             )
 
+        # Extract acceptance criteria text from the relationship
+        acceptance_criteria = [
+            ev.text_ar for ev in level_criteria.acceptance_evidence
+        ] if level_criteria.acceptance_evidence else []
+
         # Perform AI analysis
         analysis = await self._ai_analyze(
             document_text=evidence.extracted_text or "",
             question=question.question_ar,
             level_description=level_criteria.description_ar,
-            acceptance_criteria=level_criteria.acceptance_evidence_ar or [],
+            acceptance_criteria=acceptance_criteria,
         )
 
         # Update evidence record
@@ -214,10 +220,13 @@ class EvidenceService:
         if not evidence:
             raise ValueError("Evidence not found")
 
-        # Get question with levels
+        # Get question with levels and acceptance evidence
         question_result = await self.db.execute(
             select(NDIQuestion)
-            .options(selectinload(NDIQuestion.maturity_levels))
+            .options(
+                selectinload(NDIQuestion.maturity_levels)
+                .selectinload(NDIMaturityLevel.acceptance_evidence)
+            )
             .where(NDIQuestion.code == question_code.upper())
         )
         question = question_result.scalar_one_or_none()
@@ -240,15 +249,19 @@ class EvidenceService:
                 recommendations=["Maturity level criteria not found"],
             )
 
-        # Use appropriate language
+        # Use appropriate language - extract from acceptance_evidence relationship
         if language == "ar":
             question_text = question.question_ar
             level_desc = level_criteria.description_ar
-            criteria = level_criteria.acceptance_evidence_ar or []
+            criteria = [
+                ev.text_ar for ev in level_criteria.acceptance_evidence
+            ] if level_criteria.acceptance_evidence else []
         else:
             question_text = question.question_en
             level_desc = level_criteria.description_en
-            criteria = level_criteria.acceptance_evidence_en or []
+            criteria = [
+                ev.text_en for ev in level_criteria.acceptance_evidence
+            ] if level_criteria.acceptance_evidence else []
 
         # Perform analysis
         analysis = await self._ai_analyze(

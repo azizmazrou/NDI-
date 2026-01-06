@@ -139,8 +139,8 @@ async def chat(
 
 @router.post("/evidence/analyze-response")
 async def analyze_response_evidence(
-    response_id: UUID,
-    language: str = Query("ar"),
+    response_id: UUID = Query(..., description="Response UUID to analyze"),
+    language: str = Query("ar", description="Language for response"),
     db: AsyncSession = Depends(get_db),
 ):
     """تحليل شواهد إجابة محددة."""

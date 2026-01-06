@@ -23,6 +23,8 @@ from app.schemas.ai import (
 from app.services.ai_service import AIService
 from app.services.evidence_service import EvidenceService
 from app.services.ai_evidence_service import AIEvidenceService
+from app.services.rag_service import RAGService
+from app.models.embedding import Embedding
 
 router = APIRouter()
 
@@ -179,3 +181,68 @@ async def quick_check_evidence(
         question_code=data.question_code,
         target_level=data.target_level,
     )
+
+
+# =============================================================================
+# RAG Management Endpoints
+# =============================================================================
+
+@router.get("/rag/status")
+async def get_rag_status(db: AsyncSession = Depends(get_db)):
+    """Get RAG indexing status."""
+    result = await db.execute(select(Embedding))
+    embeddings = result.scalars().all()
+
+    # Count by type
+    type_counts = {}
+    for e in embeddings:
+        type_counts[e.source_type] = type_counts.get(e.source_type, 0) + 1
+
+    # Check if embeddings have vectors
+    has_vectors = any(e.embedding_ar is not None or e.embedding_en is not None for e in embeddings)
+
+    return {
+        "status": "ready" if embeddings else "not_indexed",
+        "total_documents": len(embeddings),
+        "by_type": type_counts,
+        "has_vectors": has_vectors,
+        "message": "RAG index is ready" if embeddings else "NDI data not indexed yet. Click 'Reindex NDI Data' to create the index."
+    }
+
+
+@router.post("/rag/reindex")
+async def reindex_rag(db: AsyncSession = Depends(get_db)):
+    """Reindex all NDI data for RAG."""
+    service = RAGService(db)
+
+    try:
+        count = await service.index_ndi_data()
+        return {
+            "status": "success",
+            "message": f"Successfully indexed {count} items",
+            "count": count
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@router.get("/rag/search")
+async def search_rag(
+    query: str,
+    language: str = "ar",
+    top_k: int = 5,
+    db: AsyncSession = Depends(get_db),
+):
+    """Search RAG index."""
+    service = RAGService(db)
+    results = await service.retrieve(query, language=language, top_k=top_k)
+
+    return {
+        "status": "success",
+        "query": query,
+        "results": results.get("sources", []),
+        "context": results.get("context", "")[:500] + "..." if len(results.get("context", "")) > 500 else results.get("context", "")
+    }

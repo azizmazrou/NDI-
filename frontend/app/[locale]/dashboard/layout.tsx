@@ -18,6 +18,7 @@ import {
   Sparkles,
   Upload,
   BookOpen,
+  Database,
 } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "next-themes";
@@ -72,9 +73,14 @@ export default function DashboardLayout({
       label: locale === "ar" ? "المساعد الذكي" : "AI Assistant",
     },
     {
+      href: `/${locale}/dashboard/rag`,
+      icon: <Database className="h-5 w-5" />,
+      label: locale === "ar" ? "قاعدة المعرفة (RAG)" : "Knowledge Base (RAG)",
+    },
+    {
       href: `/${locale}/knowledge`,
       icon: <BookOpen className="h-5 w-5" />,
-      label: locale === "ar" ? "قاعدة المعرفة" : "Knowledge Base",
+      label: locale === "ar" ? "دليل NDI" : "NDI Guide",
     },
     {
       href: `/${locale}/dashboard/settings`,

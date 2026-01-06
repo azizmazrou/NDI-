@@ -450,6 +450,31 @@ export const aiApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  // RAG Management
+  getRagStatus: () =>
+    fetchApi<{
+      status: string;
+      total_documents: number;
+      by_type: Record<string, number>;
+      has_vectors: boolean;
+      message: string;
+    }>("/ai/rag/status"),
+
+  reindexRag: () =>
+    fetchApi<{ status: string; message: string; count?: number }>("/ai/rag/reindex", {
+      method: "POST",
+    }),
+
+  searchRag: (query: string, language?: string, topK?: number) =>
+    fetchApi<{
+      status: string;
+      query: string;
+      results: any[];
+      context: string;
+    }>("/ai/rag/search", {
+      params: { query, language, top_k: topK },
+    }),
 };
 
 // Users

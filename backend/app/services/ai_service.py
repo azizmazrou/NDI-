@@ -137,6 +137,9 @@ class AIService:
                 else:
                     priority = "low"
 
+                actions = self._get_actions_for_gap(response.selected_level, target_level, language)
+                recommendation = ", ".join(actions) if actions else ""
+
                 gaps.append(
                     GapItem(
                         domain_code=domain.code if domain else "N/A",
@@ -146,10 +149,9 @@ class AIService:
                         current_level=response.selected_level,
                         target_level=target_level,
                         gap=gap,
-                        actions_required=self._get_actions_for_gap(
-                            response.selected_level, target_level, language
-                        ),
+                        actions_required=actions,
                         priority=priority,
+                        recommendation=recommendation,
                     )
                 )
 
@@ -158,6 +160,7 @@ class AIService:
         gaps.sort(key=lambda x: (priority_order[x.priority], -x.gap))
 
         overall_gap = total_gap / gap_count if gap_count > 0 else 0
+        high_priority_count = sum(1 for g in gaps if g.priority == "high")
 
         # Generate summary
         if language == "ar":
@@ -170,8 +173,12 @@ class AIService:
             critical = [g.question for g in gaps if g.priority == "high"][:3]
 
         return GapAnalysisResponse(
+            status="success",
             assessment_id=assessment_id,
+            target_level=target_level,
             overall_gap=overall_gap,
+            total_gaps=len(gaps),
+            high_priority_gaps=high_priority_count,
             gaps=gaps,
             summary=summary,
             quick_wins=quick_wins,
@@ -235,10 +242,18 @@ class AIService:
             # Determine effort based on gap size
             if gap.gap >= 3:
                 effort = "high"
+                effort_level = "عالي" if language == "ar" else "High"
             elif gap.gap >= 2:
                 effort = "medium"
+                effort_level = "متوسط" if language == "ar" else "Medium"
             else:
                 effort = "low"
+                effort_level = "منخفض" if language == "ar" else "Low"
+
+            impact = "high" if gap.priority == "high" else "medium"
+            expected_impact = "عالي" if language == "ar" and impact == "high" else (
+                "High" if impact == "high" else ("متوسط" if language == "ar" else "Medium")
+            )
 
             recommendations.append(
                 Recommendation(
@@ -248,9 +263,12 @@ class AIService:
                     description=f"{'الانتقال من المستوى' if language == 'ar' else 'Move from level'} {gap.current_level} {'إلى' if language == 'ar' else 'to'} {gap.target_level}",
                     priority=gap.priority,
                     effort=effort,
-                    impact="high" if gap.priority == "high" else "medium",
+                    effort_level=effort_level,
+                    impact=impact,
+                    expected_impact=expected_impact,
                     prerequisites=gap.actions_required[:2] if len(gap.actions_required) > 2 else [],
                     expected_outcome=gap.actions_required[-1] if gap.actions_required else "",
+                    steps=gap.actions_required,
                 )
             )
 
@@ -260,7 +278,9 @@ class AIService:
             roadmap = f"Improvement plan with {len(recommendations)} recommendations to achieve target level"
 
         return RecommendationResponse(
+            status="success",
             assessment_id=assessment_id,
+            total_recommendations=len(recommendations),
             recommendations=recommendations,
             roadmap_summary=roadmap,
         )

@@ -342,7 +342,24 @@ class AIEvidenceService:
 """
 
             response_text = await self._call_llm(prompt)
+
+            # Check for empty response
+            if not response_text:
+                return {
+                    "status": "error",
+                    "message": "AI returned empty response. Please check AI provider configuration." if language == "en" else "استجابة الذكاء الاصطناعي فارغة. يرجى التحقق من تكوين مزود الذكاء الاصطناعي.",
+                }
+
             response_text = response_text.strip()
+
+            # Check for empty after strip
+            if not response_text:
+                return {
+                    "status": "error",
+                    "message": "AI returned empty response. Please check AI provider configuration." if language == "en" else "استجابة الذكاء الاصطناعي فارغة. يرجى التحقق من تكوين مزود الذكاء الاصطناعي.",
+                }
+
+            # Extract JSON from markdown code blocks if present
             if response_text.startswith("```"):
                 parts = response_text.split("```")
                 if len(parts) >= 2:
@@ -350,6 +367,14 @@ class AIEvidenceService:
                     if response_text.startswith("json"):
                         response_text = response_text[4:]
                     response_text = response_text.strip()
+
+            # Try to find JSON object in the response
+            if not response_text.startswith("{"):
+                # Try to find JSON object in the text
+                json_start = response_text.find("{")
+                json_end = response_text.rfind("}") + 1
+                if json_start != -1 and json_end > json_start:
+                    response_text = response_text[json_start:json_end]
 
             suggestion = json.loads(response_text)
             return {
@@ -363,7 +388,7 @@ class AIEvidenceService:
         except json.JSONDecodeError as e:
             return {
                 "status": "error",
-                "message": f"Failed to parse AI response: {str(e)}" if language == "en" else f"فشل في تحليل استجابة الذكاء الاصطناعي: {str(e)}",
+                "message": f"Failed to parse AI response. The AI may have returned an invalid format. Error: {str(e)}" if language == "en" else f"فشل في تحليل استجابة الذكاء الاصطناعي. قد يكون التنسيق غير صحيح. الخطأ: {str(e)}",
             }
         except Exception as e:
             return {
